@@ -12,7 +12,7 @@ app = Flask(__name__)
 model = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False)
 
 
-@app.route('/ocr', methods=['POST'])
+@app.route("/ocr", methods=["POST"])
 def ocr_service():
     try:
         # 获取请求数据
@@ -51,23 +51,22 @@ def ocr_service():
             else:
                 bounding_box = []
 
-            ocr_results.append({
-                "text": line[1][0],  # 识别文本
-                "confidence": float(line[1][1]),  # 置信度
-                "bounding_box": bounding_box  # 文本框坐标
-            })
+            ocr_results.append(
+                {
+                    "text": line[1][0],  # 识别文本
+                    "confidence": float(line[1][1]),  # 置信度
+                    "bounding_box": bounding_box,  # 文本框坐标
+                }
+            )
 
         # 返回结果
-        return jsonify({
-            "processing_time": processing_time,
-            "results": ocr_results
-        })
+        return jsonify({"processing_time": processing_time, "results": ocr_results})
 
     except Exception as e:
         # 捕获所有异常并返回错误信息
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # 启动 Flask 服务
     app.run(host="0.0.0.0", port=5005, debug=False)

@@ -21,16 +21,8 @@ def get_rotate_crop_image(img, points):
     points[:, 1] = points[:, 1] - top
     """
     assert len(points) == 4, "shape of points must be 4*2"
-    img_crop_width = int(
-        max(
-            np.linalg.norm(points[0] - points[1]), np.linalg.norm(points[2] - points[3])
-        )
-    )
-    img_crop_height = int(
-        max(
-            np.linalg.norm(points[0] - points[3]), np.linalg.norm(points[1] - points[2])
-        )
-    )
+    img_crop_width = int(max(np.linalg.norm(points[0] - points[1]), np.linalg.norm(points[2] - points[3])))
+    img_crop_height = int(max(np.linalg.norm(points[0] - points[3]), np.linalg.norm(points[1] - points[2])))
     pts_std = np.float32(
         [
             [0, 0],
@@ -132,9 +124,7 @@ def text_visual(
     return(array):
     """
     if scores is not None:
-        assert len(texts) == len(
-            scores
-        ), "The number of txts and corresponding scores must match"
+        assert len(texts) == len(scores), "The number of txts and corresponding scores must match"
 
     def create_blank_img():
         blank_img = np.ones(shape=[img_h, img_w], dtype=np.int8) * 255
@@ -320,9 +310,7 @@ def infer_args():
         default=str(module_dir / "models/ppocrv5/ppocrv5_dict.txt"),
     )
     parser.add_argument("--use_space_char", type=str2bool, default=True)
-    parser.add_argument(
-        "--vis_font_path", type=str, default=str(module_dir / "fonts/simfang.ttf")
-    )
+    parser.add_argument("--vis_font_path", type=str, default=str(module_dir / "fonts/simfang.ttf"))
     parser.add_argument("--drop_score", type=float, default=0.5)
 
     # params for e2e
@@ -364,13 +352,9 @@ def infer_args():
     parser.add_argument("--sr_batch_num", type=int, default=1)
 
     #
-    parser.add_argument(
-        "--draw_img_save_dir", type=str, default=str(module_dir / "inference_results")
-    )
+    parser.add_argument("--draw_img_save_dir", type=str, default=str(module_dir / "inference_results"))
     parser.add_argument("--save_crop_res", type=str2bool, default=False)
-    parser.add_argument(
-        "--crop_res_save_dir", type=str, default=str(module_dir / "output")
-    )
+    parser.add_argument("--crop_res_save_dir", type=str, default=str(module_dir / "output"))
 
     # multi-process
     parser.add_argument("--use_mp", type=str2bool, default=False)
@@ -378,9 +362,7 @@ def infer_args():
     parser.add_argument("--process_id", type=int, default=0)
 
     parser.add_argument("--benchmark", type=str2bool, default=False)
-    parser.add_argument(
-        "--save_log_path", type=str, default=str(module_dir / "log_output/")
-    )
+    parser.add_argument("--save_log_path", type=str, default=str(module_dir / "log_output/"))
 
     parser.add_argument("--show_log", type=str2bool, default=True)
     parser.add_argument("--use_onnx", type=str2bool, default=False)

@@ -7,7 +7,13 @@ from PIL import Image
 from .rec_postprocess import CTCLabelDecode
 from .predict_base import PredictBase
 
+import ray
 
+
+@ray.serve.deployment(
+    name="text_recognizer",
+    ray_actor_options={"num_cpus": 0, "num_gpus": 0.3},
+)
 class TextRecognizer(PredictBase):
     def __init__(self, args):
         self.rec_image_shape = [int(v) for v in args.rec_image_shape.split(",")]
@@ -80,7 +86,6 @@ class TextRecognizer(PredictBase):
         return padding_im
 
     def resize_norm_img_vl(self, img, image_shape):
-
         imgC, imgH, imgW = image_shape
         img = img[:, :, ::-1]  # bgr2rgb
         resized_image = cv2.resize(img, (imgW, imgH), interpolation=cv2.INTER_LINEAR)
@@ -115,33 +120,18 @@ class TextRecognizer(PredictBase):
         return np.reshape(img_black, (c, row, col)).astype(np.float32)
 
     def srn_other_inputs(self, image_shape, num_heads, max_text_length):
-
         imgC, imgH, imgW = image_shape
         feature_dim = int((imgH / 8) * (imgW / 8))
 
-        encoder_word_pos = (
-            np.array(range(0, feature_dim)).reshape((feature_dim, 1)).astype("int64")
-        )
-        gsrm_word_pos = (
-            np.array(range(0, max_text_length))
-            .reshape((max_text_length, 1))
-            .astype("int64")
-        )
+        encoder_word_pos = np.array(range(0, feature_dim)).reshape((feature_dim, 1)).astype("int64")
+        gsrm_word_pos = np.array(range(0, max_text_length)).reshape((max_text_length, 1)).astype("int64")
 
         gsrm_attn_bias_data = np.ones((1, max_text_length, max_text_length))
-        gsrm_slf_attn_bias1 = np.triu(gsrm_attn_bias_data, 1).reshape(
-            [-1, 1, max_text_length, max_text_length]
-        )
-        gsrm_slf_attn_bias1 = np.tile(gsrm_slf_attn_bias1, [1, num_heads, 1, 1]).astype(
-            "float32"
-        ) * [-1e9]
+        gsrm_slf_attn_bias1 = np.triu(gsrm_attn_bias_data, 1).reshape([-1, 1, max_text_length, max_text_length])
+        gsrm_slf_attn_bias1 = np.tile(gsrm_slf_attn_bias1, [1, num_heads, 1, 1]).astype("float32") * [-1e9]
 
-        gsrm_slf_attn_bias2 = np.tril(gsrm_attn_bias_data, -1).reshape(
-            [-1, 1, max_text_length, max_text_length]
-        )
-        gsrm_slf_attn_bias2 = np.tile(gsrm_slf_attn_bias2, [1, num_heads, 1, 1]).astype(
-            "float32"
-        ) * [-1e9]
+        gsrm_slf_attn_bias2 = np.tril(gsrm_attn_bias_data, -1).reshape([-1, 1, max_text_length, max_text_length])
+        gsrm_slf_attn_bias2 = np.tile(gsrm_slf_attn_bias2, [1, num_heads, 1, 1]).astype("float32") * [-1e9]
 
         encoder_word_pos = encoder_word_pos[np.newaxis, :]
         gsrm_word_pos = gsrm_word_pos[np.newaxis, :]
@@ -157,8 +147,8 @@ class TextRecognizer(PredictBase):
         norm_img = self.resize_norm_img_srn(img, image_shape)
         norm_img = norm_img[np.newaxis, :]
 
-        [encoder_word_pos, gsrm_word_pos, gsrm_slf_attn_bias1, gsrm_slf_attn_bias2] = (
-            self.srn_other_inputs(image_shape, num_heads, max_text_length)
+        [encoder_word_pos, gsrm_word_pos, gsrm_slf_attn_bias1, gsrm_slf_attn_bias2] = self.srn_other_inputs(
+            image_shape, num_heads, max_text_length
         )
 
         gsrm_slf_attn_bias1 = gsrm_slf_attn_bias1.astype(np.float32)
@@ -226,7 +216,6 @@ class TextRecognizer(PredictBase):
         return img
 
     def resize_norm_img_svtr(self, img, image_shape):
-
         imgC, imgH, imgW = image_shape
         resized_image = cv2.resize(img, (imgW, imgH), interpolation=cv2.INTER_LINEAR)
         resized_image = resized_image.astype("float32")
@@ -236,7 +225,6 @@ class TextRecognizer(PredictBase):
         return resized_image
 
     def resize_norm_img_abinet(self, img, image_shape):
-
         imgC, imgH, imgW = image_shape
 
         resized_image = cv2.resize(img, (imgW, imgH), interpolation=cv2.INTER_LINEAR)
@@ -252,7 +240,6 @@ class TextRecognizer(PredictBase):
         return resized_image
 
     def norm_img_can(self, img, image_shape):
-
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # CAN only predict gray scale image
 
         if self.inverse:
@@ -277,7 +264,7 @@ class TextRecognizer(PredictBase):
 
         return img
 
-    def __call__(self, img_list):
+    async def run(self, img_list):
         img_num = len(img_list)
         # Calculate the aspect ratio of all text bars
         width_list = []
@@ -313,9 +300,7 @@ class TextRecognizer(PredictBase):
             # img = np.expand_dims(img, axis=0)
             # print(img.shape)
             input_feed = self.get_input_feed(self.rec_input_name, norm_img_batch)
-            outputs = self.rec_onnx_session.run(
-                self.rec_output_name, input_feed=input_feed
-            )
+            outputs = self.rec_onnx_session.run(self.rec_output_name, input_feed=input_feed)
 
             preds = outputs[0]
 

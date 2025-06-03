@@ -67,9 +67,7 @@ class BaseRecLabelDecode(object):
             for ignored_token in ignored_tokens:
                 selection &= text_index[batch_idx] != ignored_token
 
-            char_list = [
-                self.character[text_id] for text_id in text_index[batch_idx][selection]
-            ]
+            char_list = [self.character[text_id] for text_id in text_index[batch_idx][selection]]
             if text_prob is not None:
                 conf_list = text_prob[batch_idx][selection]
             else:
@@ -126,11 +124,9 @@ class DistillationCTCLabelDecode(CTCLabelDecode):
         model_name=["student"],
         key=None,
         multi_head=False,
-        **kwargs
+        **kwargs,
     ):
-        super(DistillationCTCLabelDecode, self).__init__(
-            character_dict_path, use_space_char
-        )
+        super(DistillationCTCLabelDecode, self).__init__(character_dict_path, use_space_char)
         if not isinstance(model_name, list):
             model_name = [model_name]
         self.model_name = model_name
@@ -179,10 +175,7 @@ class AttnLabelDecode(BaseRecLabelDecode):
                     break
                 if is_remove_duplicate:
                     # only for predict
-                    if (
-                        idx > 0
-                        and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]
-                    ):
+                    if idx > 0 and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]:
                         continue
                 char_list.append(self.character[int(text_index[batch_idx][idx])])
                 if text_prob is not None:
@@ -257,10 +250,7 @@ class RFLLabelDecode(BaseRecLabelDecode):
                     break
                 if is_remove_duplicate:
                     # only for predict
-                    if (
-                        idx > 0
-                        and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]
-                    ):
+                    if idx > 0 and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]:
                         continue
                 char_list.append(self.character[int(text_index[batch_idx][idx])])
                 if text_prob is not None:
@@ -354,10 +344,7 @@ class SEEDLabelDecode(BaseRecLabelDecode):
                     break
                 if is_remove_duplicate:
                     # only for predict
-                    if (
-                        idx > 0
-                        and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]
-                    ):
+                    if idx > 0 and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]:
                         continue
                 char_list.append(self.character[int(text_index[batch_idx][idx])])
                 if text_prob is not None:
@@ -436,10 +423,7 @@ class SRNLabelDecode(BaseRecLabelDecode):
                     continue
                 if is_remove_duplicate:
                     # only for predict
-                    if (
-                        idx > 0
-                        and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]
-                    ):
+                    if idx > 0 and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]:
                         continue
                 char_list.append(self.character[int(text_index[batch_idx][idx])])
                 if text_prob is not None:
@@ -510,10 +494,7 @@ class SARLabelDecode(BaseRecLabelDecode):
                         break
                 if is_remove_duplicate:
                     # only for predict
-                    if (
-                        idx > 0
-                        and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]
-                    ):
+                    if idx > 0 and text_index[batch_idx][idx - 1] == text_index[batch_idx][idx]:
                         continue
                 char_list.append(self.character[int(text_index[batch_idx][idx])])
                 if text_prob is not None:
@@ -558,11 +539,9 @@ class DistillationSARLabelDecode(SARLabelDecode):
         model_name=["student"],
         key=None,
         multi_head=False,
-        **kwargs
+        **kwargs,
     ):
-        super(DistillationSARLabelDecode, self).__init__(
-            character_dict_path, use_space_char
-        )
+        super(DistillationSARLabelDecode, self).__init__(character_dict_path, use_space_char)
         if not isinstance(model_name, list):
             model_name = [model_name]
         self.model_name = model_name
@@ -646,7 +625,6 @@ class NRTRLabelDecode(BaseRecLabelDecode):
         super(NRTRLabelDecode, self).__init__(character_dict_path, use_space_char)
 
     def __call__(self, preds, label=None, *args, **kwargs):
-
         if len(preds) == 2:
             preds_id = preds[0]
             preds_prob = preds[1]

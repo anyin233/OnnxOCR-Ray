@@ -3,7 +3,13 @@ from .imaug import transform, create_operators
 from .db_postprocess import DBPostProcess
 from .predict_base import PredictBase
 
+import ray
 
+
+@ray.serve.deployment(
+    name="text_detector",
+    ray_actor_options={"num_cpus": 0, "num_gpus": 0.3},
+)
 class TextDetector(PredictBase):
     def __init__(self, args):
         self.args = args
@@ -91,7 +97,7 @@ class TextDetector(PredictBase):
         dt_boxes = np.array(dt_boxes_new)
         return dt_boxes
 
-    def __call__(self, img):
+    async def run(self, img):
         ori_im = img.copy()
         data = {"image": img}
 

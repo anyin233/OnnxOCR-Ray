@@ -6,7 +6,13 @@ import math
 from .cls_postprocess import ClsPostProcess
 from .predict_base import PredictBase
 
+import ray
 
+
+@ray.serve.deployment(
+    name="text_classifier",
+    ray_actor_options={"num_cpus": 0, "num_gpus": 0.3},
+)
 class TextClassifier(PredictBase):
     def __init__(self, args):
         self.cls_image_shape = [int(v) for v in args.cls_image_shape.split(",")]
@@ -41,7 +47,7 @@ class TextClassifier(PredictBase):
         padding_im[:, :, 0:resized_w] = resized_image
         return padding_im
 
-    def __call__(self, img_list):
+    async def run(self, img_list):
         img_list = copy.deepcopy(img_list)
         img_num = len(img_list)
         # Calculate the aspect ratio of all text bars
@@ -55,7 +61,6 @@ class TextClassifier(PredictBase):
         batch_num = self.cls_batch_num
 
         for beg_img_no in range(0, img_num, batch_num):
-
             end_img_no = min(img_num, beg_img_no + batch_num)
             norm_img_batch = []
             max_wh_ratio = 0
@@ -72,9 +77,7 @@ class TextClassifier(PredictBase):
             norm_img_batch = norm_img_batch.copy()
 
             input_feed = self.get_input_feed(self.cls_input_name, norm_img_batch)
-            outputs = self.cls_onnx_session.run(
-                self.cls_output_name, input_feed=input_feed
-            )
+            outputs = self.cls_onnx_session.run(self.cls_output_name, input_feed=input_feed)
 
             prob_out = outputs[0]
 
@@ -83,7 +86,5 @@ class TextClassifier(PredictBase):
                 label, score = cls_result[rno]
                 cls_res[indices[beg_img_no + rno]] = [label, score]
                 if "180" in label and score > self.cls_thresh:
-                    img_list[indices[beg_img_no + rno]] = cv2.rotate(
-                        img_list[indices[beg_img_no + rno]], 1
-                    )
+                    img_list[indices[beg_img_no + rno]] = cv2.rotate(img_list[indices[beg_img_no + rno]], 1)
         return img_list, cls_res
