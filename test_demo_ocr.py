@@ -90,7 +90,7 @@ def check_service_status():
     """检查OCR服务是否正在运行"""
     try:
         # 尝试访问服务，看是否响应
-        response = requests.get("http://localhost:5005/", timeout=2)
+        requests.get("http://localhost:5005/", timeout=2)
         return True
     except:
         return False

@@ -1,9 +1,9 @@
 import numpy as np
+import re
 
 # import paddle
 paddle = None
 # from paddle.nn import functional as F
-import re
 
 
 class BaseRecLabelDecode(object):

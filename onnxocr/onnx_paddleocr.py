@@ -16,11 +16,22 @@ import numpy as np
 
 import cv2
 
+
+import os
+import copy
+from . import predict_det
+from . import predict_cls
+from . import predict_rec
+from .utils import get_rotate_crop_image, get_minarea_rect_crop
+
+
+
 class OCRRequest(BaseModel):
     img: str  # Base64 encoded image
     det: bool = True  # Whether to perform detection
     rec: bool = True  # Whether to perform recognition
     cls: bool = True  # Whether to use angle classification
+
 
 class OCRResponse(BaseModel):
     ocr_res: list  # List of OCR results
@@ -28,18 +39,9 @@ class OCRResponse(BaseModel):
     cls_res: list
     processing_time: float  # Time taken for processing
 
+
 app = fastapi.FastAPI()
 
-
-import os
-import cv2
-import copy
-from . import predict_det
-from . import predict_cls
-from . import predict_rec
-from .utils import get_rotate_crop_image, get_minarea_rect_crop
-
-import ray
 
 
 def sorted_boxes(dt_boxes):
@@ -86,9 +88,9 @@ else:
     ray_actor_options={"num_cpus": 0, "num_gpus": 0},
 )
 @ray.serve.ingress(app)
-class ONNXPaddleOcr():
+class ONNXPaddleOcr:
     def __init__(self, params, detector=None, recognizer=None, classifier=None, **kwargs):
-                # 初始化模型
+        # 初始化模型
         self.use_angle_cls = params.use_angle_cls
         self.drop_score = params.drop_score
         self.text_detector = detector
@@ -100,7 +102,6 @@ class ONNXPaddleOcr():
         self.crop_image_res_index = 0
 
         self.sorted_boxes = sorted_boxes
-
 
     async def draw_crop_rec_res(self, output_dir, img_crop_list, rec_res):
         os.makedirs(output_dir, exist_ok=True)
@@ -163,8 +164,7 @@ class ONNXPaddleOcr():
         img_array = np.frombuffer(img_data, np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
 
-
-        if cls == True and self.use_angle_cls == False:
+        if cls and not self.use_angle_cls:
             print(
                 "Since the angle classifier is not initialized, the angle classifier will not be uesd during the forward process"
             )
@@ -173,14 +173,13 @@ class ONNXPaddleOcr():
             dt_boxes, rec_res = await self.run(img, cls)
             tmp_res = [{"boxes": box.tolist(), "res": res} for box, res in zip(dt_boxes, rec_res)]
             response.ocr_res.append(tmp_res)
-            
+
         elif det and not rec:
             dt_boxes = await self.text_detector.run.remote(img)
             tmp_res = [{"boxes": box.tolist()} for box in dt_boxes]
             response.det_res.append(tmp_res)
 
         else:
-
             if not isinstance(img, list):
                 img = [img]
             if self.use_angle_cls and cls:
@@ -189,46 +188,10 @@ class ONNXPaddleOcr():
                     response.cls_res.append(cls_res_tmp)
             rec_res = await self.text_recognizer.run.remote(img)
             response.ocr_res.append(rec_res)
-        
+
         return response
 
+
 ocr_app = ONNXPaddleOcr.bind(
-    params,
-    detector=detector,
-    recognizer=recognizer,
-    classifier=classifier if params.use_angle_cls else None
+    params, detector=detector, recognizer=recognizer, classifier=classifier if params.use_angle_cls else None
 )
-
-def sav2Img(org_img, result, name="draw_ocr.jpg"):
-    # 显示结果
-    from PIL import Image
-
-    result = result[0]
-    # image = Image.open(img_path).convert('RGB')
-    # 图像转BGR2RGB
-    image = org_img[:, :, ::-1]
-    boxes = [line[0] for line in result]
-    txts = [line[1][0] for line in result]
-    scores = [line[1][1] for line in result]
-    im_show = draw_ocr(image, boxes, txts, scores)
-    im_show = Image.fromarray(im_show)
-    im_show.save(name)
-
-
-if __name__ == "__main__":
-    import cv2
-    import base64
-    import numpy as np
-
-    model = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False)
-
-    img = cv2.imread("/data2/liujingsong3/fiber_box/test/img/20230531230052008263304.jpg")
-    s = time.time()
-    result = model.ocr(img)
-    e = time.time()
-    print("total time: {:.3f}".format(e - s))
-    print("result:", result)
-    for box in result[0]:
-        print(box)
-
-    sav2Img(img, result)
