@@ -37,7 +37,10 @@ class OCRResponse(BaseModel):
     ocr_res: list  # List of OCR results
     det_res: list
     cls_res: list
-    processing_time: float  # Time taken for processing
+    received_time: float
+    finish_time: float
+    rec_time: float = 0.0
+    det_time: float = 0.0
 
 
 app = fastapi.FastAPI()
@@ -117,7 +120,7 @@ class ONNXPaddleOcr:
     async def run(self, img, cls=True):
         ori_im = img
         # 文字检测
-        dt_boxes = await self.text_detector.run.remote(img)
+        dt_boxes, det_time = await self.text_detector.run.remote(img)
 
         if dt_boxes is None:
             return None, None
@@ -140,7 +143,7 @@ class ONNXPaddleOcr:
             img_crop_list, angle_list = await self.text_classifier.run.remote(img_crop_list)
 
         # 图像识别
-        rec_res = await self.text_recognizer.run.remote(img_crop_list)
+        rec_res, rec_time = await self.text_recognizer.run.remote(img_crop_list)
 
         if self.args.save_crop_res:
             self.draw_crop_rec_res(self.args.crop_res_save_dir, img_crop_list, rec_res)
@@ -151,7 +154,7 @@ class ONNXPaddleOcr:
                 filter_boxes.append(box)
                 filter_rec_res.append(rec_result)
 
-        return filter_boxes, filter_rec_res
+        return filter_boxes, filter_rec_res, det_time, rec_time
 
     @app.post("/ocr")
     async def ocr(self, request: OCRRequest) -> OCRResponse:
@@ -159,6 +162,8 @@ class ONNXPaddleOcr:
         det = request.det
         rec = request.rec
         img = request.img
+
+        response = OCRResponse(ocr_res=[], det_res=[], cls_res=[], received_time=time.time(), finish_time=0)
         # Decode base64 image to cv2 format
         img_data = base64.b64decode(img)
         img_array = np.frombuffer(img_data, np.uint8)
@@ -168,17 +173,18 @@ class ONNXPaddleOcr:
             print(
                 "Since the angle classifier is not initialized, the angle classifier will not be uesd during the forward process"
             )
-        response = OCRResponse(ocr_res=[], det_res=[], cls_res=[], processing_time=0.0)
+        
         if det and rec:
-            dt_boxes, rec_res = await self.run(img, cls)
+            dt_boxes, rec_res, det_time, rec_time = await self.run(img, cls)
             tmp_res = [{"boxes": box.tolist(), "res": res} for box, res in zip(dt_boxes, rec_res)]
             response.ocr_res.append(tmp_res)
-
+            response.det_time = det_time
+            response.rec_time = rec_time
         elif det and not rec:
-            dt_boxes = await self.text_detector.run.remote(img)
+            dt_boxes, det_time = await self.text_detector.run.remote(img)
             tmp_res = [{"boxes": box.tolist()} for box in dt_boxes]
             response.det_res.append(tmp_res)
-
+            response.det_time = det_time
         else:
             if not isinstance(img, list):
                 img = [img]
@@ -186,9 +192,12 @@ class ONNXPaddleOcr:
                 img, cls_res_tmp = await self.text_classifier.run.remote(img)
                 if not rec:
                     response.cls_res.append(cls_res_tmp)
-            rec_res = await self.text_recognizer.run.remote(img)
+            rec_res, rec_time = await self.text_recognizer.run.remote(img)
             response.ocr_res.append(rec_res)
+            
+            response.rec_time = rec_time
 
+        response.finish_time = time.time()
         return response
 
 

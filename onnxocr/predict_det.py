@@ -5,6 +5,8 @@ from .predict_base import PredictBase
 
 import ray
 
+import time
+
 
 @ray.serve.deployment(
     name="text_detector",
@@ -98,6 +100,7 @@ class TextDetector(PredictBase):
         return dt_boxes
 
     async def run(self, img):
+        start_time = time.time()
         ori_im = img.copy()
         data = {"image": img}
 
@@ -123,4 +126,5 @@ class TextDetector(PredictBase):
         else:
             dt_boxes = self.filter_tag_det_res(dt_boxes, ori_im.shape)
 
-        return dt_boxes
+        processing_time = time.time() - start_time
+        return dt_boxes, processing_time

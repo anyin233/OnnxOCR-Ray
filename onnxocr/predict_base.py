@@ -11,8 +11,11 @@ class PredictBase(object):
             providers = [("CUDAExecutionProvider", {"cudnn_conv_algo_search": "DEFAULT"}), "CPUExecutionProvider"]
         else:
             providers = ["CPUExecutionProvider"]
+        session_options = onnxruntime.SessionOptions()
+        session_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
+        session_options.optimized_model_filepath = model_dir + ".opt.onnx"
 
-        onnx_session = onnxruntime.InferenceSession(model_dir, None, providers=providers)
+        onnx_session = onnxruntime.InferenceSession(model_dir, session_options, providers=providers)
 
         # print("providers:", onnxruntime.get_device())
         return onnx_session

@@ -9,6 +9,7 @@ from .predict_base import PredictBase
 
 import ray
 
+import time
 
 @ray.serve.deployment(
     name="text_recognizer",
@@ -265,6 +266,7 @@ class TextRecognizer(PredictBase):
         return img
 
     async def run(self, img_list):
+        start_time = time.time()
         img_num = len(img_list)
         # Calculate the aspect ratio of all text bars
         width_list = []
@@ -307,5 +309,5 @@ class TextRecognizer(PredictBase):
             rec_result = self.postprocess_op(preds)
             for rno in range(len(rec_result)):
                 rec_res[indices[beg_img_no + rno]] = rec_result[rno]
-
-        return rec_res
+        processing_time = time.time() - start_time
+        return rec_res, processing_time
