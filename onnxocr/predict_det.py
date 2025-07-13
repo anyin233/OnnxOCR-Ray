@@ -2,16 +2,9 @@ import numpy as np
 from .imaug import transform, create_operators
 from .db_postprocess import DBPostProcess
 from .predict_base import PredictBase
-
-import ray
-
 import time
 
 
-@ray.serve.deployment(
-    name="text_detector",
-    ray_actor_options={"num_cpus": 0, "num_gpus": 0.3},
-)
 class TextDetector(PredictBase):
     def __init__(self, args):
         self.args = args
@@ -46,7 +39,6 @@ class TextDetector(PredictBase):
 
         # 实例化预处理操作类
         self.preprocess_op = create_operators(pre_process_list)
-        # self.postprocess_op = build_post_process(postprocess_params)
         # 实例化后处理操作类
         self.postprocess_op = DBPostProcess(**postprocess_params)
 
@@ -56,15 +48,18 @@ class TextDetector(PredictBase):
         self.det_output_name = self.get_output_name(self.det_onnx_session)
 
     def order_points_clockwise(self, pts):
-        rect = np.zeros((4, 2), dtype="float32")
-        s = pts.sum(axis=1)
-        rect[0] = pts[np.argmin(s)]
-        rect[2] = pts[np.argmax(s)]
-        tmp = np.delete(pts, (np.argmin(s), np.argmax(s)), axis=0)
-        diff = np.diff(np.array(tmp), axis=1)
-        rect[1] = tmp[np.argmin(diff)]
-        rect[3] = tmp[np.argmax(diff)]
-        return rect
+        xSorted = pts[np.argsort(pts[:, 0]), :]
+
+        leftMost = xSorted[:2, :]
+        rightMost = xSorted[2:, :]
+
+        leftMost = leftMost[np.argsort(leftMost[:, 1]), :]
+        (tl, bl) = leftMost
+
+        D = np.linalg.norm(np.cross(rightMost[0] - tl, rightMost[1] - tl)) / np.linalg.norm(rightMost[1] - rightMost[0])
+        (br, tr) = rightMost[np.argsort(rightMost[:, 1]), :] if D > 0 else rightMost[np.argsort(rightMost[:, 1])[::-1], :]
+
+        return np.array([tl, tr, br, bl], dtype="float32")
 
     def clip_det_res(self, points, img_height, img_width):
         for pno in range(points.shape[0]):
@@ -99,7 +94,8 @@ class TextDetector(PredictBase):
         dt_boxes = np.array(dt_boxes_new)
         return dt_boxes
 
-    async def run(self, img):
+    def run(self, img):
+        """串行执行文本检测"""
         start_time = time.time()
         ori_im = img.copy()
         data = {"image": img}
@@ -128,3 +124,8 @@ class TextDetector(PredictBase):
 
         processing_time = time.time() - start_time
         return dt_boxes, processing_time
+
+    def __call__(self, img):
+        """支持直接调用"""
+        dt_boxes, _ = self.run(img)
+        return dt_boxes

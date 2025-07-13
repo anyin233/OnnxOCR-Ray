@@ -2,17 +2,10 @@ import cv2
 import copy
 import numpy as np
 import math
-
 from .cls_postprocess import ClsPostProcess
 from .predict_base import PredictBase
 
-import ray
 
-
-@ray.serve.deployment(
-    name="text_classifier",
-    ray_actor_options={"num_cpus": 0, "num_gpus": 0.3},
-)
 class TextClassifier(PredictBase):
     def __init__(self, args):
         self.cls_image_shape = [int(v) for v in args.cls_image_shape.split(",")]
@@ -47,7 +40,8 @@ class TextClassifier(PredictBase):
         padding_im[:, :, 0:resized_w] = resized_image
         return padding_im
 
-    async def run(self, img_list):
+    def run(self, img_list):
+        """串行执行角度分类"""
         img_list = copy.deepcopy(img_list)
         img_num = len(img_list)
         # Calculate the aspect ratio of all text bars
@@ -88,3 +82,7 @@ class TextClassifier(PredictBase):
                 if "180" in label and score > self.cls_thresh:
                     img_list[indices[beg_img_no + rno]] = cv2.rotate(img_list[indices[beg_img_no + rno]], 1)
         return img_list, cls_res
+
+    def __call__(self, img_list):
+        """支持直接调用"""
+        return self.run(img_list)

@@ -1,50 +1,13 @@
 import time
-
-# from .predict_system import TextSystem
-from .utils import infer_args as init_args
-from .utils import str2bool, draw_ocr
-import argparse
-import sys
-
-import ray
-import fastapi
-
-from pydantic import BaseModel
-
-import base64
-import numpy as np
-
-import cv2
-
-
-import os
 import copy
-from . import predict_det
-from . import predict_cls
-from . import predict_rec
+import numpy as np
+import cv2
+from .utils import infer_args as init_args
 from .utils import get_rotate_crop_image, get_minarea_rect_crop
-
-
-
-class OCRRequest(BaseModel):
-    img: str  # Base64 encoded image
-    det: bool = True  # Whether to perform detection
-    rec: bool = True  # Whether to perform recognition
-    cls: bool = True  # Whether to use angle classification
-
-
-class OCRResponse(BaseModel):
-    ocr_res: list  # List of OCR results
-    det_res: list
-    cls_res: list
-    received_time: float
-    finish_time: float
-    rec_time: float = 0.0
-    det_time: float = 0.0
-
-
-app = fastapi.FastAPI()
-
+from .predict_det import TextDetector
+from .predict_cls import TextClassifier
+from .predict_rec import TextRecognizer
+import argparse
 
 
 def sorted_boxes(dt_boxes):
@@ -70,43 +33,33 @@ def sorted_boxes(dt_boxes):
     return _boxes
 
 
-parser = init_args()
-inference_args_dict = {}
-for action in parser._actions:
-    inference_args_dict[action.dest] = action.default
-params = argparse.Namespace(**inference_args_dict)
-params.rec_image_shape = "3, 48, 320"
-
-
-detector = predict_det.TextDetector.bind(params)
-recognizer = predict_rec.TextRecognizer.bind(params)
-if params.use_angle_cls:
-    classifier = predict_cls.TextClassifier.bind(params)
-else:
-    classifier = None
-
-
-@ray.serve.deployment(
-    name="onnx_paddle_ocr",
-    ray_actor_options={"num_cpus": 0, "num_gpus": 0},
-)
-@ray.serve.ingress(app)
 class ONNXPaddleOcr:
-    def __init__(self, params, detector=None, recognizer=None, classifier=None, **kwargs):
-        # 初始化模型
-        self.use_angle_cls = params.use_angle_cls
-        self.drop_score = params.drop_score
-        self.text_detector = detector
-        self.text_recognizer = recognizer
+    def __init__(self, use_angle_cls=True, use_gpu=False, **kwargs):
+        params = init_args()
+        params.rec_image_shape = "3, 48, 320"
+        params.use_angle_cls = use_angle_cls
+        params.use_gpu = use_gpu
+        
+        # 更新参数
+        for key, value in kwargs.items():
+            if hasattr(params, key):
+                setattr(params, key, value)
+
+        # 初始化模型组件
+        self.text_detector = TextDetector(params)
+        self.text_recognizer = TextRecognizer(params)
         if params.use_angle_cls:
-            self.text_classifier = classifier
+            self.text_classifier = TextClassifier(params)
+        else:
+            self.text_classifier = None
 
         self.args = params
+        self.use_angle_cls = params.use_angle_cls
+        self.drop_score = params.drop_score
         self.crop_image_res_index = 0
 
-        self.sorted_boxes = sorted_boxes
-
-    async def draw_crop_rec_res(self, output_dir, img_crop_list, rec_res):
+    def draw_crop_rec_res(self, output_dir, img_crop_list, rec_res):
+        import os
         os.makedirs(output_dir, exist_ok=True)
         bbox_num = len(img_crop_list)
         for bno in range(bbox_num):
@@ -114,19 +67,18 @@ class ONNXPaddleOcr:
                 os.path.join(output_dir, f"mg_crop_{bno + self.crop_image_res_index}.jpg"),
                 img_crop_list[bno],
             )
-
         self.crop_image_res_index += bbox_num
 
-    async def run(self, img, cls=True):
+    def run(self, img, cls=True):
+        """执行OCR流程（检测+分类+识别）"""
         ori_im = img
         # 文字检测
-        dt_boxes, det_time = await self.text_detector.run.remote(img)
+        dt_boxes, det_time = self.text_detector.run(img)
 
-        if dt_boxes is None:
-            return None, None
+        if dt_boxes is None or len(dt_boxes) == 0:
+            return None, None, det_time, 0
 
         img_crop_list = []
-
         dt_boxes = sorted_boxes(dt_boxes)
 
         # 图片裁剪
@@ -139,14 +91,19 @@ class ONNXPaddleOcr:
             img_crop_list.append(img_crop)
 
         # 方向分类
-        if self.use_angle_cls and cls:
-            img_crop_list, angle_list = await self.text_classifier.run.remote(img_crop_list)
+        rec_time = 0
+        if self.use_angle_cls and cls and self.text_classifier is not None:
+            img_crop_list, angle_list = self.text_classifier.run(img_crop_list)
 
         # 图像识别
-        rec_res, rec_time = await self.text_recognizer.run.remote(img_crop_list)
+        if len(img_crop_list) > 0:
+            rec_res, rec_time = self.text_recognizer.run(img_crop_list)
+        else:
+            rec_res = []
 
-        if self.args.save_crop_res:
+        if hasattr(self.args, 'save_crop_res') and self.args.save_crop_res:
             self.draw_crop_rec_res(self.args.crop_res_save_dir, img_crop_list, rec_res)
+        
         filter_boxes, filter_rec_res = [], []
         for box, rec_result in zip(dt_boxes, rec_res):
             text, score = rec_result
@@ -156,51 +113,38 @@ class ONNXPaddleOcr:
 
         return filter_boxes, filter_rec_res, det_time, rec_time
 
-    @app.post("/ocr")
-    async def ocr(self, request: OCRRequest) -> OCRResponse:
-        cls = request.cls
-        det = request.det
-        rec = request.rec
-        img = request.img
-
-        response = OCRResponse(ocr_res=[], det_res=[], cls_res=[], received_time=time.time(), finish_time=0)
-        # Decode base64 image to cv2 format
-        img_data = base64.b64decode(img)
-        img_array = np.frombuffer(img_data, np.uint8)
-        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
+    def ocr(self, img, cls=True):
+        """完整的OCR流程"""
         if cls and not self.use_angle_cls:
-            print(
-                "Since the angle classifier is not initialized, the angle classifier will not be uesd during the forward process"
-            )
+            print("Since the angle classifier is not initialized, the angle classifier will not be used during the forward process")
         
-        if det and rec:
-            dt_boxes, rec_res, det_time, rec_time = await self.run(img, cls)
-            tmp_res = [{"boxes": box.tolist(), "res": res} for box, res in zip(dt_boxes, rec_res)]
-            response.ocr_res.append(tmp_res)
-            response.det_time = det_time
-            response.rec_time = rec_time
-        elif det and not rec:
-            dt_boxes, det_time = await self.text_detector.run.remote(img)
-            tmp_res = [{"boxes": box.tolist()} for box in dt_boxes]
-            response.det_res.append(tmp_res)
-            response.det_time = det_time
+        dt_boxes, rec_res, det_time, rec_time = self.run(img, cls)
+        if dt_boxes is None:
+            return [None]
+        
+        # 格式化输出结果
+        result = []
+        for box, res in zip(dt_boxes, rec_res):
+            result.append([box, res])
+        
+        return [result]
+
+    def detection_only(self, img):
+        """仅执行文本检测"""
+        dt_boxes, det_time = self.text_detector.run(img)
+        return dt_boxes
+
+    def classification_only(self, img_crop_list):
+        """仅执行角度分类"""
+        if self.use_angle_cls and self.text_classifier is not None:
+            return self.text_classifier.run(img_crop_list)
         else:
-            if not isinstance(img, list):
-                img = [img]
-            if self.use_angle_cls and cls:
-                img, cls_res_tmp = await self.text_classifier.run.remote(img)
-                if not rec:
-                    response.cls_res.append(cls_res_tmp)
-            rec_res, rec_time = await self.text_recognizer.run.remote(img)
-            response.ocr_res.append(rec_res)
-            
-            response.rec_time = rec_time
+            return img_crop_list, [(0, 1.0) for _ in img_crop_list]
 
-        response.finish_time = time.time()
-        return response
-
-
-ocr_app = ONNXPaddleOcr.bind(
-    params, detector=detector, recognizer=recognizer, classifier=classifier if params.use_angle_cls else None
-)
+    def recognition_only(self, img_crop_list):
+        """仅执行文本识别"""
+        if len(img_crop_list) > 0:
+            rec_res, rec_time = self.text_recognizer.run(img_crop_list)
+            return rec_res
+        else:
+            return []
