@@ -1,163 +1,244 @@
+# OCR Microservices
 
-English | [简体中文](./Readme_cn.md) |
+## Usage
 
-### **OnnxOCR**  
-### ![onnx_logo](onnxocr/test_images/onnxocr_logo.png)  
+```
+uv run service_entry_point.py -s <service> -p <port> -h <host>
+```
 
-**A High-Performance Multilingual OCR Engine Based on ONNX**  
+Support services:
+- classification: Angle classification
+- detection: Text detection
+- recognition: Text recognition
 
-[![GitHub Stars](https://img.shields.io/github/stars/jingsongliujing/OnnxOCR?style=social&label=Star&maxAge=3600)](https://github.com/jingsongliujing/OnnxOCR/stargazers)  
-[![GitHub Forks](https://img.shields.io/github/forks/jingsongliujing/OnnxOCR?style=social&label=Fork&maxAge=3600)](https://github.com/jingsongliujing/OnnxOCR/network/members)  
-[![GitHub License](https://img.shields.io/github/license/jingsongliujing/OnnxOCR)](https://github.com/jingsongliujing/OnnxOCR/blob/main/LICENSE)  
-[![Python Version](https://img.shields.io/badge/Python-%E2%89%A53.6-blue.svg)](https://www.python.org/)  
+## API Reference
 
+### Common APIs
 
-## 🚀 Version Updates  
-- **2025.05.21**  
-  1. Added PP-OCRv5 model, supporting 5 language types in a single model: Simplified Chinese, Traditional Chinese, Chinese Pinyin, English, and Japanese.  
-  2. Overall recognition accuracy improved by 13% compared to PP-OCRv4.  
-  3. Accuracy is consistent with PaddleOCR 3.0.  
+#### GET `/stop`
+Stop current microservice
 
+**Response**
+```
+{"message": "Service is stopping"}
+```
 
-## 🌟 Core Advantages  
-1. **Deep Learning Framework-Free**: A universal OCR engine ready for direct deployment.  
-2. **Cross-Architecture Support**: Uses PaddleOCR-converted ONNX models, rebuilt for deployment on both ARM and x86 architecture computers with unchanged accuracy under limited computing power.  
-3. **High-Performance Inference**: Faster inference speed on computers with the same performance.  
-4. **Multilingual Support**: Single model supports 5 language types: Simplified Chinese, Traditional Chinese, Chinese Pinyin, English, and Japanese.  
-5. **Model Accuracy**: Consistent with PaddleOCR models.  
-6. **Domestic Hardware Adaptation**: Restructured code architecture for easy adaptation to more domestic GPUs by modifying only the inference engine.  
+### Text Classification Service API Reference
 
+A FastAPI-based text angle classification service using ONNX models to detect and correct text orientation.
 
-## 🛠️ Environment Setup  
-```bash  
-python>=3.6  
+### Endpoints
 
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt  
-```  
+#### GET `/`
+Health check endpoint.
 
-**Note**:  
-- The Mobile version model is used by default; the PP-OCRv5_Server-ONNX model offers better performance.  
-- The Mobile model is already in `onnxocr/models/ppocrv5` and requires no download;  
-- The PP-OCRv5_Server-ONNX model is large and uploaded to [Baidu Netdisk](https://pan.baidu.com/s/1hpENH_SkLDdwXkmlsX0GUQ?pwd=wu8t) (extraction code: wu8t). After downloading, place the `det` and `rec` models in `./models/ppocrv5/` to replace the existing ones.  
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "text_classification"
+}
+```
 
+#### POST `/inference`
+Classify text angles from detected bounding boxes.
 
-## 🚀 One-Click Run  
-```bash  
-python test_ocr.py  
-```  
+**Request Body:**
+```json
+{
+  "image": "string",           // base64 encoded image
+  "bounding_boxes": [
+    {
+      "coordinates": [           // 4 corner points
+        [x1, y1], [x2, y2], [x3, y3], [x4, y4]
+      ]
+    }
+  ]
+}
+```
 
+**Response:**
+```json
+{
+  "processing_time": 0.0,
+  "results": [
+    {
+      "angle": 0,                      // 0, 90, 180, or 270
+      "confidence": 0.95,
+      "rotated_image": "string",       // base64 encoded corrected image
+      "bounding_box": [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+    }
+  ]
+}
+```
 
-## 📡 API Service (CPU Example)  
-### Start Service  
-```bash  
-python app-service.py  
-```  
+#### POST `/inference_single`
+Classify text angle for a single image.
 
-### Test Example  
-#### Request  
-```bash  
-curl -X POST http://localhost:5005/ocr \  
--H "Content-Type: application/json" \  
--d '{"image": "base64_encoded_image_data"}'  
-```  
+**Request Body:**
+```json
+{
+  "image": "string"             // base64 encoded image
+}
+```
 
-#### Response  
-```json  
-{  
-  "processing_time": 0.456,  
-  "results": [  
-    {  
-      "text": "Name",  
-      "confidence": 0.9999361634254456,  
-      "bounding_box": [[4.0, 8.0], [31.0, 8.0], [31.0, 24.0], [4.0, 24.0]]  
-    },  
-    {  
-      "text": "Header",  
-      "confidence": 0.9998759031295776,  
-      "bounding_box": [[233.0, 7.0], [258.0, 7.0], [258.0, 23.0], [233.0, 23.0]]  
-    }  
-  ]  
-}  
-```  
+**Response:**
+```json
+{
+  "angle": 0,                   // 0, 90, 180, or 270
+  "confidence": 0.95,
+  "rotated_image": "string",    // base64 encoded corrected image
+  "bounding_box": null
+}
+```
 
+### Error Responses
+- `400`: Invalid image format or decoding error
+- `500`: Internal classification error
 
-## 🐳 Docker Image Environment (CPU)  
-### Build Image  
-```bash  
-docker build -t ocr-service .  
-```  
+---
 
-### Run Image  
-```bash  
-docker run -itd --name onnxocr-service-v3 -p 5006:5005 onnxocr-service:v3  
-```  
+### Text Detection Service API Reference
 
-### POST Request  
-```  
-url: ip:5006/ocr  
-```  
+A FastAPI-based text detection service using ONNX models to detect text regions in images.
 
-### Response Example  
-```json  
-{  
-  "processing_time": 0.456,  
-  "results": [  
-    {  
-      "text": "Name",  
-      "confidence": 0.9999361634254456,  
-      "bounding_box": [[4.0, 8.0], [31.0, 8.0], [31.0, 24.0], [4.0, 24.0]]  
-    },  
-    {  
-      "text": "Header",  
-      "confidence": 0.9998759031295776,  
-      "bounding_box": [[233.0, 7.0], [258.0, 7.0], [258.0, 23.0], [233.0, 23.0]]  
-    }  
-  ]  
-}  
-```  
+#### Base URL
+`http://localhost:5006`
 
+#### Endpoints
 
-## 🌟 Effect Demonstration  
-| Example 1 | Example 2 |  
-|-----------|-----------|  
-| ![](result_img/r1.png) | ![](result_img/r2.png) |  
+##### GET `/`
+Health check endpoint.
 
-| Example 3 | Example 4 |  
-|-----------|-----------|  
-| ![](result_img/r3.png) | ![](result_img/draw_ocr4.jpg) |  
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "text_detection"
+}
+```
 
-| Example 5 | Example 6 |  
-|-----------|-----------|  
-| ![](result_img/draw_ocr5.jpg) | ![](result_img/555.png) |  
+##### POST `/inference`
+Detect text regions in an image.
 
+**Request Body:**
+```json
+{
+  "image": "string"             // base64 encoded image
+}
+```
 
-## 👨💻 Contact & Communication  
-### Career Opportunities  
-I am currently seeking job opportunities. Welcome to connect!  
-![WeChat QR Code](onnxocr/test_images/myQR.jpg)  
+**Response:**
+```json
+{
+  "processing_time": 0.0,
+  "bounding_boxes": [
+    {
+      "coordinates": [           // 4 corner points for each detected text region
+        [x1, y1], [x2, y2], [x3, y3], [x4, y4]
+      ]
+    }
+  ]
+}
+```
 
-### OnnxOCR Community  
-#### WeChat Group  
-![WeChat Group](onnxocr/test_images/微信群.jpg)  
+##### POST `/inference_no_crop`
+Alternative endpoint with identical functionality to `/inference`.
 
-#### QQ Group  
-![QQ Group](onnxocr/test_images/QQ群.jpg)  
+**Request Body:**
+```json
+{
+  "image": "string"             // base64 encoded image
+}
+```
 
+**Response:**
+Same as `/inference` endpoint.
 
-## 🎉 Acknowledgments  
-Thanks to [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for technical support!  
+#### Error Responses
+- `400`: Invalid image format or decoding error
+- `500`: Internal detection
 
+---
 
-## 🌍 Open Source & Donations  
-I am passionate about open source and AI technology, believing they can bring convenience and help to those in need, making the world a better place. If you recognize this project, you can support it via Alipay or WeChat Pay (please note "Support OnnxOCR" in the remarks).  
+### Text Recognition Service API Reference
 
-<img src="onnxocr/test_images/weixin_pay.jpg" alt="WeChat Pay" width="200">
-<img src="onnxocr/test_images/zhifubao_pay.jpg" alt="Alipay" width="200">
+A FastAPI-based text recognition service using ONNX models to extract text content from detected text regions.
 
+#### Base URL
+`http://localhost:5007`
 
-## 📈 Star History  
-[![Star History Chart](https://api.star-history.com/svg?repos=jingsongliujing/OnnxOCR&type=Date)](https://star-history.com/#jingsongliujing/OnnxOCR&Date)  
+#### Endpoints
 
+##### GET `/`
+Health check endpoint.
 
-## 🤝 Contribution Guidelines  
-Welcome to submit Issues and Pull Requests to improve the project together!  
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "text_recognition"
+}
+```
+
+##### POST `/inference`
+Recognize text from detected bounding boxes with optional classification results.
+
+**Request Body:**
+```json
+{
+  "image": "string",           // base64 encoded image
+  "bounding_boxes": [
+    {
+      "coordinates": [           // 4 corner points
+        [x1, y1], [x2, y2], [x3, y3], [x4, y4]
+      ]
+    }
+  ],
+  "classification_results": [    // optional angle correction results
+    {
+      "angle": 0,                // 0, 90, 180, or 270
+      "confidence": 0.95,
+      "rotated_image": "string"  // base64 encoded corrected image
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "processing_time": 0.0,
+  "results": [
+    {
+      "text": "recognized text",
+      "confidence": 0.95,
+      "bounding_box": [[x1,y1], [x2,y2], [x3,y3], [x4,y4]],
+      "angle": 0
+    }
+  ]
+}
+```
+
+##### POST `/inference_single`
+Recognize text from a single image.
+
+**Request Body:**
+```json
+{
+  "image": "string"             // base64 encoded image
+}
+```
+
+**Response:**
+```json
+{
+  "text": "recognized text",
+  "confidence": 0.95,
+  "bounding_box": null,
+  "angle": null
+}
+```
+
+#### Error Responses
+- `400`: Invalid image format or dec
