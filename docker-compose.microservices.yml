@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  detection-service:
+    build: .
+    command: python detection_service.py
+    ports:
+      - "5006:5006"
+    volumes:
+      - ./onnxocr:/app/onnxocr
+      - ./models:/app/models
+    environment:
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  recognition-service:
+    build: .
+    command: python recognition_service.py
+    ports:
+      - "5007:5007"
+    volumes:
+      - ./onnxocr:/app/onnxocr
+      - ./models:/app/models
+    environment:
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5007/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  classification-service:
+    build: .
+    command: python classification_service.py
+    ports:
+      - "5008:5008"
+    volumes:
+      - ./onnxocr:/app/onnxocr
+      - ./models:/app/models
+    environment:
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5008/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  orchestrator-service:
+    build: .
+    command: python orchestrator_service.py
+    ports:
+      - "5009:5009"
+    volumes:
+      - ./onnxocr:/app/onnxocr
+    environment:
+      - PYTHONPATH=/app
+      - DETECTION_SERVICE_URL=http://detection-service:5006
+      - RECOGNITION_SERVICE_URL=http://recognition-service:5007
+      - CLASSIFICATION_SERVICE_URL=http://classification-service:5008
+    depends_on:
+      - detection-service
+      - recognition-service
+      - classification-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5009/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
