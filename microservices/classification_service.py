@@ -103,7 +103,7 @@ def crop_image_from_box(img, box):
         print(f"Crop error: {e}")
         return None
 
-@app.post("/classify", response_model=ClassificationResponse)
+@app.post("/inference", response_model=ClassificationResponse)
 async def classify_text_angle(request: ClassificationRequest):
     """Text angle classification service - based on detection bounding boxes"""
     try:
@@ -159,56 +159,7 @@ async def classify_text_angle(request: ClassificationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Classification error: {str(e)}")
 
-@app.post("/classify_legacy", response_model=ClassificationResponse)
-async def classify_text_angle_legacy(request: LegacyClassificationRequest):
-    """Text angle classification service - batch processing (backward compatibility)"""
-    try:
-        # Decode all images
-        img_list = []
-        for image_base64 in request.images:
-            img = decode_image(image_base64)
-            img_list.append(img)
-
-        if not img_list:
-            return ClassificationResponse(processing_time=0.0, results=[])
-
-        # Execute text angle classification
-        start_time = time.time()
-        rotated_imgs, cls_res = classifier(img_list)
-        end_time = time.time()
-        processing_time = end_time - start_time
-
-        # Format results
-        results = []
-        for i, (rotated_img, cls_result) in enumerate(zip(rotated_imgs, cls_res)):
-            if isinstance(cls_result, (list, tuple)) and len(cls_result) >= 2:
-                angle = int(cls_result[0])  # angle
-                confidence = float(cls_result[1])  # confidence
-            else:
-                angle = 0
-                confidence = 1.0
-
-            # Encode rotated image
-            rotated_image_base64 = encode_image(rotated_img)
-
-            results.append(ClassificationResult(
-                angle=angle,
-                confidence=confidence,
-                rotated_image=rotated_image_base64,
-                bounding_box=None  # No bounding box in compatibility mode
-            ))
-
-        return ClassificationResponse(
-            processing_time=processing_time,
-            results=results
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Classification error: {str(e)}")
-
-@app.post("/classify_single", response_model=ClassificationResult)
+@app.post("/inference_single", response_model=ClassificationResult)
 async def classify_single_text_angle(request: SingleImageRequest):
     """Text angle classification service - single image"""
     try:

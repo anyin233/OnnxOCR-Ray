@@ -101,7 +101,7 @@ def crop_image_from_box(img, box):
         print(f"Crop error: {e}")
         return None
 
-@app.post("/recognize", response_model=RecognitionResponse)
+@app.post("/inference", response_model=RecognitionResponse)
 async def recognize_text(request: RecognitionRequest):
     """Text recognition service - based on detection bounding boxes and classification results"""
     try:
@@ -167,53 +167,8 @@ async def recognize_text(request: RecognitionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recognition error: {str(e)}")
 
-@app.post("/recognize_legacy", response_model=RecognitionResponse)
-async def recognize_text_legacy(request: LegacyRecognitionRequest):
-    """Text recognition service - batch processing (backward compatibility)"""
-    try:
-        # Decode all images
-        img_list = []
-        for image_base64 in request.images:
-            img = decode_image(image_base64)
-            img_list.append(img)
 
-        if not img_list:
-            return RecognitionResponse(processing_time=0.0, results=[])
-
-        # Execute text recognition
-        start_time = time.time()
-        rec_res = recognizer(img_list)
-        end_time = time.time()
-        processing_time = end_time - start_time
-
-        # Format results
-        results = []
-        for res in rec_res:
-            if isinstance(res, (list, tuple)) and len(res) >= 2:
-                text = str(res[0])
-                confidence = float(res[1])
-            else:
-                text = str(res)
-                confidence = 1.0
-            
-            results.append(RecognitionResult(
-                text=text,
-                confidence=confidence,
-                bounding_box=None,  # No bounding box in compatibility mode
-                angle=None
-            ))
-
-        return RecognitionResponse(
-            processing_time=processing_time,
-            results=results
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Recognition error: {str(e)}")
-
-@app.post("/recognize_single", response_model=RecognitionResult)
+@app.post("/inference_single", response_model=RecognitionResult)
 async def recognize_single_text(request: SingleImageRequest):
     """Text recognition service - single image"""
     try:

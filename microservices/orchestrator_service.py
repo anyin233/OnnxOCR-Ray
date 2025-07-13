@@ -145,7 +145,7 @@ async def health_check():
         "services": services_status
     }
 
-@app.post("/ocr", response_model=OCRResponse)
+@app.post("/inference", response_model=OCRResponse)
 async def orchestrate_ocr(request: OCRRequest):
     """OCR orchestration service - coordinates all sub-services"""
     try:

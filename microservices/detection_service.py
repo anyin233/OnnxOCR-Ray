@@ -44,7 +44,7 @@ async def health_check():
     """健康检查"""
     return {"status": "healthy", "service": "text_detection"}
 
-@app.post("/detect", response_model=DetectionResponse)
+@app.post("/inference", response_model=DetectionResponse)
 async def detect_text(request: DetectionRequest):
     """文本检测服务"""
     try:
@@ -83,12 +83,10 @@ async def detect_text(request: DetectionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Detection error: {str(e)}")
 
-@app.post("/detect_from_crops", response_model=DetectionResponse)
+@app.post("/inference_no_crop", response_model=DetectionResponse)
 async def detect_from_crops(request: DetectionRequest):
-    """从裁剪图像中检测文本（用于级联处理）"""
     return await detect_text(request)
 
 if __name__ == '__main__':
     import uvicorn
-    # 启动检测服务，端口 5006
     uvicorn.run(app, host="0.0.0.0", port=5006)
