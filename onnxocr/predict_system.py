@@ -25,7 +25,7 @@ class TextSystem(object):
         for bno in range(bbox_num):
             cv2.imwrite(
                 os.path.join(
-                    output_dir, f"mg_crop_{bno+self.crop_image_res_index}.jpg"
+                    output_dir, f"mg_crop_{bno + self.crop_image_res_index}.jpg"
                 ),
                 img_crop_list[bno],
             )

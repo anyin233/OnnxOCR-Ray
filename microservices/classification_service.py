@@ -13,9 +13,13 @@ from typing import List, Optional
 from onnxocr.predict_cls import TextClassifier
 from onnxocr.utils import infer_args as init_args
 import argparse
+from microservices.common import decode_image, encode_image, crop_image_from_box
 
 # Initialize FastAPI application
-app = FastAPI(title="TextClassificationService", description="Text Classification Service using ONNX")
+app = FastAPI(
+    title="TextClassificationService",
+    description="Text Classification Service using ONNX",
+)
 
 # Initialize classification model
 parser = init_args()
@@ -27,19 +31,26 @@ params.use_gpu = True
 
 classifier = TextClassifier(params)
 
+
 # Define request models
 class BoundingBox(BaseModel):
-    coordinates: List[List[float]]  # 4 points coordinates [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+    coordinates: List[
+        List[float]
+    ]  # 4 points coordinates [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+
 
 class ClassificationRequest(BaseModel):
     image: str  # base64 encoded original image
     bounding_boxes: List[BoundingBox]  # List of detected bounding boxes
 
+
 class LegacyClassificationRequest(BaseModel):
     images: List[str]  # base64 encoded image list (backward compatibility)
 
+
 class SingleImageRequest(BaseModel):
     image: str  # base64 encoded single image
+
 
 # Define response models
 class ClassificationResult(BaseModel):
@@ -48,60 +59,17 @@ class ClassificationResult(BaseModel):
     rotated_image: Optional[str] = None  # rotated image (base64 encoded)
     bounding_box: Optional[List[List[float]]] = None  # corresponding bounding box
 
+
 class ClassificationResponse(BaseModel):
     processing_time: float
     results: List[ClassificationResult]
+
 
 @app.get("/")
 async def health_check():
     """Health check"""
     return {"status": "healthy", "service": "text_classification"}
 
-def decode_image(image_base64: str):
-    """Decode base64 image"""
-    try:
-        image_bytes = base64.b64decode(image_base64)
-        image_np = np.frombuffer(image_bytes, dtype=np.uint8)
-        img = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError("Failed to decode image from base64")
-        return img
-    except Exception as e:
-        raise ValueError(f"Image decoding failed: {str(e)}")
-
-def encode_image(img):
-    """Encode image to base64"""
-    try:
-        _, buffer = cv2.imencode('.jpg', img)
-        img_base64 = base64.b64encode(buffer).decode('utf-8')
-        return img_base64
-    except Exception as e:
-        raise ValueError(f"Image encoding failed: {str(e)}")
-
-def crop_image_from_box(img, box):
-    """Crop image based on bounding box"""
-    try:
-        # Import necessary functions
-        import copy
-        from onnxocr.utils import get_rotate_crop_image
-        
-        # Ensure box is in correct format: 4 points, each point has 2 coordinates
-        if len(box) != 4:
-            print(f"Invalid bounding box: expected 4 points, got {len(box)}")
-            return None
-        
-        # Convert to numpy array, ensure it's float32 type with shape (4, 2)
-        box_array = np.array(box, dtype=np.float32)
-        if box_array.shape != (4, 2):
-            print(f"Invalid bounding box shape: expected (4, 2), got {box_array.shape}")
-            return None
-        
-        # Use quadrilateral cropping
-        img_crop = get_rotate_crop_image(img, box_array)
-        return img_crop
-    except Exception as e:
-        print(f"Crop error: {e}")
-        return None
 
 @app.post("/inference", response_model=ClassificationResponse)
 async def classify_text_angle(request: ClassificationRequest):
@@ -109,20 +77,20 @@ async def classify_text_angle(request: ClassificationRequest):
     try:
         # Decode original image
         img = decode_image(request.image)
-        
+
         # Crop images based on bounding boxes
         img_crop_list = []
         valid_boxes = []
-        
+
         for bbox in request.bounding_boxes:
             img_crop = crop_image_from_box(img, bbox.coordinates)
             if img_crop is not None:
                 img_crop_list.append(img_crop)
                 valid_boxes.append(bbox.coordinates)
-        
+
         if not img_crop_list:
             return ClassificationResponse(processing_time=0.0, results=[])
-        
+
         # Execute text angle classification
         start_time = time.time()
         rotated_imgs, cls_res = classifier(img_crop_list)
@@ -131,7 +99,9 @@ async def classify_text_angle(request: ClassificationRequest):
 
         # Format results
         results = []
-        for i, (rotated_img, cls_result, bbox) in enumerate(zip(rotated_imgs, cls_res, valid_boxes)):
+        for i, (rotated_img, cls_result, bbox) in enumerate(
+            zip(rotated_imgs, cls_res, valid_boxes)
+        ):
             if isinstance(cls_result, (list, tuple)) and len(cls_result) >= 2:
                 angle = int(cls_result[0])  # angle
                 confidence = float(cls_result[1])  # confidence
@@ -142,22 +112,22 @@ async def classify_text_angle(request: ClassificationRequest):
             # Encode rotated image
             rotated_image_base64 = encode_image(rotated_img)
 
-            results.append(ClassificationResult(
-                angle=angle,
-                confidence=confidence,
-                rotated_image=rotated_image_base64,
-                bounding_box=bbox
-            ))
+            results.append(
+                ClassificationResult(
+                    angle=angle,
+                    confidence=confidence,
+                    rotated_image=rotated_image_base64,
+                    bounding_box=bbox,
+                )
+            )
 
-        return ClassificationResponse(
-            processing_time=processing_time,
-            results=results
-        )
+        return ClassificationResponse(processing_time=processing_time, results=results)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Classification error: {str(e)}")
+
 
 @app.post("/inference_single", response_model=ClassificationResult)
 async def classify_single_text_angle(request: SingleImageRequest):
@@ -175,7 +145,7 @@ async def classify_single_text_angle(request: SingleImageRequest):
         if rotated_imgs and cls_res and len(rotated_imgs) > 0 and len(cls_res) > 0:
             rotated_img = rotated_imgs[0]
             cls_result = cls_res[0]
-            
+
             if isinstance(cls_result, (list, tuple)) and len(cls_result) >= 2:
                 angle = int(cls_result[0])
                 confidence = float(cls_result[1])
@@ -194,7 +164,7 @@ async def classify_single_text_angle(request: SingleImageRequest):
             angle=angle,
             confidence=confidence,
             rotated_image=rotated_image_base64,
-            bounding_box=None
+            bounding_box=None,
         )
 
     except ValueError as e:
@@ -202,7 +172,9 @@ async def classify_single_text_angle(request: SingleImageRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Classification error: {str(e)}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import uvicorn
+
     # Start classification service on port 5008
     uvicorn.run(app, host="0.0.0.0", port=5008)

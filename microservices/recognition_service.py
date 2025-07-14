@@ -13,9 +13,12 @@ from typing import List, Optional
 from onnxocr.predict_rec import TextRecognizer
 from onnxocr.utils import infer_args as init_args
 import argparse
+from microservices.common import decode_image, crop_image_from_box
 
 # Initialize FastAPI application
-app = FastAPI(title="TextRecognitionService", description="Text Recognition Service using ONNX")
+app = FastAPI(
+    title="TextRecognitionService", description="Text Recognition Service using ONNX"
+)
 
 # Initialize recognition model
 parser = init_args()
@@ -28,25 +31,35 @@ params.rec_image_shape = "3, 48, 320"
 
 recognizer = TextRecognizer(params)
 
+
 # Define request models
 class BoundingBox(BaseModel):
-    coordinates: List[List[float]]  # 4 points coordinates [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+    coordinates: List[
+        List[float]
+    ]  # 4 points coordinates [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+
 
 class ClassificationInfo(BaseModel):
     angle: int  # angle
     confidence: float
     rotated_image: str  # rotated image (base64 encoded)
 
+
 class RecognitionRequest(BaseModel):
     image: str  # base64 encoded original image
     bounding_boxes: List[BoundingBox]  # List of detected bounding boxes
-    classification_results: Optional[List[ClassificationInfo]] = None  # Classification results (optional)
+    classification_results: Optional[List[ClassificationInfo]] = (
+        None  # Classification results (optional)
+    )
+
 
 class LegacyRecognitionRequest(BaseModel):
     images: List[str]  # base64 encoded image list (backward compatibility)
 
+
 class SingleImageRequest(BaseModel):
     image: str  # base64 encoded single image
+
 
 # Define response models
 class RecognitionResult(BaseModel):
@@ -55,51 +68,17 @@ class RecognitionResult(BaseModel):
     bounding_box: Optional[List[List[float]]] = None  # corresponding bounding box
     angle: Optional[int] = None  # corresponding angle information
 
+
 class RecognitionResponse(BaseModel):
     processing_time: float
     results: List[RecognitionResult]
+
 
 @app.get("/")
 async def health_check():
     """Health check"""
     return {"status": "healthy", "service": "text_recognition"}
 
-def decode_image(image_base64: str):
-    """Decode base64 image"""
-    try:
-        image_bytes = base64.b64decode(image_base64)
-        image_np = np.frombuffer(image_bytes, dtype=np.uint8)
-        img = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError("Failed to decode image from base64")
-        return img
-    except Exception as e:
-        raise ValueError(f"Image decoding failed: {str(e)}")
-
-def crop_image_from_box(img, box):
-    """Crop image based on bounding box"""
-    try:
-        # Import necessary functions
-        import copy
-        from onnxocr.utils import get_rotate_crop_image
-        
-        # Ensure box is in correct format: 4 points, each point has 2 coordinates
-        if len(box) != 4:
-            print(f"Invalid bounding box: expected 4 points, got {len(box)}")
-            return None
-        
-        # Convert to numpy array, ensure it's float32 type with shape (4, 2)
-        box_array = np.array(box, dtype=np.float32)
-        if box_array.shape != (4, 2):
-            print(f"Invalid bounding box shape: expected (4, 2), got {box_array.shape}")
-            return None
-        
-        # Use quadrilateral cropping
-        img_crop = get_rotate_crop_image(img, box_array)
-        return img_crop
-    except Exception as e:
-        print(f"Crop error: {e}")
-        return None
 
 @app.post("/inference", response_model=RecognitionResponse)
 async def recognize_text(request: RecognitionRequest):
@@ -107,21 +86,27 @@ async def recognize_text(request: RecognitionRequest):
     try:
         # Decode original image
         img = decode_image(request.image)
-        
+
         # Process image list
         img_list = []
         valid_boxes = []
         angle_info = []
-        
+
         # If classification results available, prioritize using rotated images
-        if request.classification_results and len(request.classification_results) == len(request.bounding_boxes):
-            for i, (bbox, cls_result) in enumerate(zip(request.bounding_boxes, request.classification_results)):
+        if request.classification_results and len(
+            request.classification_results
+        ) == len(request.bounding_boxes):
+            for i, (bbox, cls_result) in enumerate(
+                zip(request.bounding_boxes, request.classification_results)
+            ):
                 # Use rotated image from classification service
                 rotated_img = decode_image(cls_result.rotated_image)
                 if rotated_img is not None:
                     img_list.append(rotated_img)
                     valid_boxes.append(bbox.coordinates)
-                    angle_info.append({"angle": cls_result.angle, "confidence": cls_result.confidence})
+                    angle_info.append(
+                        {"angle": cls_result.angle, "confidence": cls_result.confidence}
+                    )
         else:
             # No classification results, crop directly from original image
             for bbox in request.bounding_boxes:
@@ -130,7 +115,7 @@ async def recognize_text(request: RecognitionRequest):
                     img_list.append(img_crop)
                     valid_boxes.append(bbox.coordinates)
                     angle_info.append({"angle": 0, "confidence": 1.0})
-        
+
         if not img_list:
             return RecognitionResponse(processing_time=0.0, results=[])
 
@@ -149,18 +134,17 @@ async def recognize_text(request: RecognitionRequest):
             else:
                 text = str(res)
                 confidence = 1.0
-            
-            results.append(RecognitionResult(
-                text=text,
-                confidence=confidence,
-                bounding_box=bbox,
-                angle=angle.get("angle")
-            ))
 
-        return RecognitionResponse(
-            processing_time=processing_time,
-            results=results
-        )
+            results.append(
+                RecognitionResult(
+                    text=text,
+                    confidence=confidence,
+                    bounding_box=bbox,
+                    angle=angle.get("angle"),
+                )
+            )
+
+        return RecognitionResponse(processing_time=processing_time, results=results)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -194,10 +178,7 @@ async def recognize_single_text(request: SingleImageRequest):
             confidence = 0.0
 
         return RecognitionResult(
-            text=text,
-            confidence=confidence,
-            bounding_box=None,
-            angle=None
+            text=text, confidence=confidence, bounding_box=None, angle=None
         )
 
     except ValueError as e:
@@ -205,7 +186,9 @@ async def recognize_single_text(request: SingleImageRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recognition error: {str(e)}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import uvicorn
+
     # Start recognition service on port 5007
     uvicorn.run(app, host="0.0.0.0", port=5007)

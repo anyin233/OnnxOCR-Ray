@@ -132,9 +132,9 @@ def text_visual(
     return(array):
     """
     if scores is not None:
-        assert len(texts) == len(
-            scores
-        ), "The number of txts and corresponding scores must match"
+        assert len(texts) == len(scores), (
+            "The number of txts and corresponding scores must match"
+        )
 
     def create_blank_img():
         blank_img = np.ones(shape=[img_h, img_w], dtype=np.int8) * 255

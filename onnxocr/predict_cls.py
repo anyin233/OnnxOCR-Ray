@@ -55,7 +55,6 @@ class TextClassifier(PredictBase):
         batch_num = self.cls_batch_num
 
         for beg_img_no in range(0, img_num, batch_num):
-
             end_img_no = min(img_num, beg_img_no + batch_num)
             norm_img_batch = []
             max_wh_ratio = 0

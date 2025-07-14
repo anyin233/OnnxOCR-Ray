@@ -1,8 +1,9 @@
 # logic.py
 import sys
 import os
+
 # 添加父目录到sys.path，便于导入onnxocr包
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from onnxocr.onnx_paddleocr import ONNXPaddleOcr, sav2Img
 import cv2
 from typing import List, Callable
@@ -19,6 +20,7 @@ except ImportError:
 # 尝试导入pymupdf用于PDF转图片
 try:
     import fitz  # pymupdf
+
     def pdf_to_images(pdf_path, dpi=200):
         """
         使用pymupdf将PDF每一页转为图片（numpy数组）
@@ -36,10 +38,12 @@ try:
 except ImportError:
     pdf_to_images = None
 
+
 class OCRLogic:
     """
     OCR 业务逻辑主类，支持批量图片/PDF识别，多线程加速，模型热切换等
     """
+
     def __init__(self, status_callback: Callable[[str], None]):
         """
         初始化，传入状态回调函数用于UI进度提示
@@ -48,7 +52,16 @@ class OCRLogic:
         # 默认初始化OCR模型
         self.model = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False)
 
-    def run(self, files: List[str], save_txt: bool, merge_txt: bool, output_img: bool = False, file_time_callback=None, pdf_progress_callback=None, max_workers: int = 4):
+    def run(
+        self,
+        files: List[str],
+        save_txt: bool,
+        merge_txt: bool,
+        output_img: bool = False,
+        file_time_callback=None,
+        pdf_progress_callback=None,
+        max_workers: int = 4,
+    ):
         """
         批量图片/PDF识别主入口，支持多线程加速
         files: 待识别文件路径列表
@@ -60,27 +73,44 @@ class OCRLogic:
         max_workers: 最大线程数，默认4
         """
         import concurrent.futures
+
         start_time = time.time()
         all_text = [None] * len(files)  # 用于顺序合并结果
+
         def process_one(idx_file):
             idx, file = idx_file
             ext = os.path.splitext(file)[1].lower()
-            self.status_callback(f"正在处理: {os.path.basename(file)} ({idx+1}/{len(files)})")
+            self.status_callback(
+                f"正在处理: {os.path.basename(file)} ({idx + 1}/{len(files)})"
+            )
             t0 = time.time()
             text = ""
             if ext == ".pdf":
                 # PDF转图片后识别
                 if pdf_to_images is None:
-                    raise RuntimeError("未安装pymupdf库，无法处理PDF文件。请先安装pymupdf。")
+                    raise RuntimeError(
+                        "未安装pymupdf库，无法处理PDF文件。请先安装pymupdf。"
+                    )
                 images = pdf_to_images(file, dpi=300)
-                text = self._ocr_images(images, file, save_txt, merge_txt, output_img=output_img, is_pdf=True, pdf_progress_callback=pdf_progress_callback, max_workers=max_workers)
+                text = self._ocr_images(
+                    images,
+                    file,
+                    save_txt,
+                    merge_txt,
+                    output_img=output_img,
+                    is_pdf=True,
+                    pdf_progress_callback=pdf_progress_callback,
+                    max_workers=max_workers,
+                )
             else:
                 # 普通图片识别，兼容中文路径
                 try:
-                    if file.lower().endswith('.bmp'):
-                        img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    if file.lower().endswith(".bmp"):
+                        img = cv2.imdecode(
+                            np.fromfile(file, dtype=np.uint8), cv2.IMREAD_COLOR
+                        )
                     else:
-                        with open(file, 'rb') as fimg:
+                        with open(file, "rb") as fimg:
                             img_array = np.frombuffer(fimg.read(), np.uint8)
                         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
                 except Exception as e:
@@ -96,15 +126,21 @@ class OCRLogic:
                 text = self._ocr_image(img, file, save_txt, output_img=output_img)
             t1 = time.time()
             if file_time_callback:
-                file_time_callback(idx, t1-t0)
-            self.status_callback(f"{os.path.basename(file)} 识别用时: {t1-t0:.2f} 秒")
+                file_time_callback(idx, t1 - t0)
+            self.status_callback(f"{os.path.basename(file)} 识别用时: {t1 - t0:.2f} 秒")
             if len(files) > 1:
                 avg = (t1 - start_time) / (idx + 1)
-                self.status_callback(f"已完成 {idx+1}/{len(files)}，平均单张用时: {avg:.2f} 秒")
+                self.status_callback(
+                    f"已完成 {idx + 1}/{len(files)}，平均单张用时: {avg:.2f} 秒"
+                )
             return (idx, text)
+
         # 多线程处理所有文件，结果按索引回填，保证顺序
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(process_one, (idx, file)) for idx, file in enumerate(files)]
+            futures = [
+                executor.submit(process_one, (idx, file))
+                for idx, file in enumerate(files)
+            ]
             for future in concurrent.futures.as_completed(futures):
                 idx, text = future.result()
                 all_text[idx] = text
@@ -121,11 +157,23 @@ class OCRLogic:
         elapsed = time.time() - start_time
         if files:
             out_dir = self._get_output_dir(files[0])
-            self.status_callback(f"识别完成，总耗时：{elapsed:.2f}秒，文件保存在：{out_dir}")
+            self.status_callback(
+                f"识别完成，总耗时：{elapsed:.2f}秒，文件保存在：{out_dir}"
+            )
         else:
             self.status_callback(f"识别完成，总耗时：{elapsed:.2f}秒")
 
-    def _ocr_images(self, images, pdf_path, save_txt, merge_txt, output_img=False, is_pdf=False, pdf_progress_callback=None, max_workers: int = 4):
+    def _ocr_images(
+        self,
+        images,
+        pdf_path,
+        save_txt,
+        merge_txt,
+        output_img=False,
+        is_pdf=False,
+        pdf_progress_callback=None,
+        max_workers: int = 4,
+    ):
         """
         PDF转图片后，批量图片识别，支持多线程加速
         images: PDF每页图片（numpy数组）
@@ -137,29 +185,38 @@ class OCRLogic:
         max_workers: 最大线程数，默认4
         """
         import concurrent.futures
+
         out_dir = self._get_output_dir(pdf_path)
         pdf_text = [None] * len(images)
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         total = len(images)
+
         def process_page(i_img):
             i, img = i_img
             img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
             result = self.model.ocr(img_cv)
             if output_img:
-                out_img_path = os.path.join(out_dir, f"{Path(pdf_path).stem}_page{i+1}_ocr.jpg")
+                out_img_path = os.path.join(
+                    out_dir, f"{Path(pdf_path).stem}_page{i + 1}_ocr.jpg"
+                )
                 sav2Img(img_cv, result, name=out_img_path)
             page_text = self._result_to_text(result)
             return (i, page_text)
+
         # 多线程识别每一页，结果按页码顺序合并
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(process_page, (i, img)) for i, img in enumerate(images)]
+            futures = [
+                executor.submit(process_page, (i, img)) for i, img in enumerate(images)
+            ]
             for future in concurrent.futures.as_completed(futures):
                 i, page_text = future.result()
                 pdf_text[i] = page_text
                 if pdf_progress_callback:
                     pdf_progress_callback(i + 1, total)
         if save_txt:
-            txt_path = os.path.join(out_dir, f"{Path(pdf_path).stem}_ocr_{timestamp}.txt")
+            txt_path = os.path.join(
+                out_dir, f"{Path(pdf_path).stem}_ocr_{timestamp}.txt"
+            )
             with open(txt_path, "w", encoding="utf-8") as f:
                 f.write("\n\n".join(pdf_text))
         return "\n\n".join(pdf_text)
@@ -176,7 +233,9 @@ class OCRLogic:
         text = self._result_to_text(result)
         if save_txt:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            txt_path = os.path.join(out_dir, f"{Path(img_path).stem}_ocr_{timestamp}.txt")
+            txt_path = os.path.join(
+                out_dir, f"{Path(img_path).stem}_ocr_{timestamp}.txt"
+            )
             with open(txt_path, "w", encoding="utf-8") as f:
                 f.write(text)
         return text
@@ -186,14 +245,26 @@ class OCRLogic:
         将OCR识别结果结构化为纯文本，兼容只检测无识别内容的情况
         """
         # 健壮性检查，防止result为空或结构异常
-        if not result or not isinstance(result, list) or not result[0] or not isinstance(result[0], list):
+        if (
+            not result
+            or not isinstance(result, list)
+            or not result[0]
+            or not isinstance(result[0], list)
+        ):
             return "[未检测到内容]"
         lines = []
         for box in result[0]:
             # 兼容只检测无识别内容的情况
-            if isinstance(box, list) and len(box) == 2 and isinstance(box[1], (list, tuple)) and len(box[1]) >= 1:
+            if (
+                isinstance(box, list)
+                and len(box) == 2
+                and isinstance(box[1], (list, tuple))
+                and len(box[1]) >= 1
+            ):
                 lines.append(str(box[1][0]))
-            elif isinstance(box, list) and (isinstance(box[0], (list, tuple)) or isinstance(box[0], float)):
+            elif isinstance(box, list) and (
+                isinstance(box[0], (list, tuple)) or isinstance(box[0], float)
+            ):
                 # 只有检测框，无识别内容
                 lines.append("[未识别] " + str(box))
             else:
@@ -216,24 +287,31 @@ class OCRLogic:
         """
         import os
         import tkinter.messagebox as messagebox
-        base_model_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "onnxocr", "models"))
+
+        base_model_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "onnxocr", "models")
+        )
         model_map = {
             "PP-OCRv5": "ppocrv5",
             "PP-OCRv4": "ppocrv4",
-            "ch_ppocr_server_v2.0": "ch_ppocr_server_v2.0"
+            "ch_ppocr_server_v2.0": "ch_ppocr_server_v2.0",
         }
         model_dir = model_map.get(model_name, "ppocrv5")
         model_path = os.path.join(base_model_dir, model_dir)
         det_model_dir = os.path.join(model_path, "det", "det.onnx")
         cls_model_dir = os.path.join(model_path, "cls", "cls.onnx")
         rec_char_dict_path = os.path.join(base_model_dir, "ppocrv5", "ppocrv5_dict.txt")
-        rec_model_dir = os.path.join(model_path, "rec", "rec.onnx") if os.path.exists(os.path.join(model_path, "rec", "rec.onnx")) else None
+        rec_model_dir = (
+            os.path.join(model_path, "rec", "rec.onnx")
+            if os.path.exists(os.path.join(model_path, "rec", "rec.onnx"))
+            else None
+        )
         ocr_kwargs = dict(
             use_angle_cls=True,
             use_gpu=use_gpu,  # 关键：传递GPU参数
             det_model_dir=det_model_dir,
             cls_model_dir=cls_model_dir,
-            rec_char_dict_path=rec_char_dict_path
+            rec_char_dict_path=rec_char_dict_path,
         )
         if rec_model_dir and os.path.exists(rec_model_dir):
             ocr_kwargs["rec_model_dir"] = rec_model_dir
@@ -242,26 +320,43 @@ class OCRLogic:
             if use_gpu:
                 try:
                     import onnxruntime as ort
-                    providers = self.model.session.get_providers() if hasattr(self.model, 'session') else []
-                    if not any('CUDA' in p for p in providers):
-                        msg = ("未检测到可用GPU，已自动切换为CPU推理。请检查CUDA/cuDNN环境配置。")
-                        if hasattr(self, 'ui_ref') and hasattr(self.ui_ref, 'update_gpu_status'):
+
+                    providers = (
+                        self.model.session.get_providers()
+                        if hasattr(self.model, "session")
+                        else []
+                    )
+                    if not any("CUDA" in p for p in providers):
+                        msg = "未检测到可用GPU，已自动切换为CPU推理。请检查CUDA/cuDNN环境配置。"
+                        if hasattr(self, "ui_ref") and hasattr(
+                            self.ui_ref, "update_gpu_status"
+                        ):
                             self.ui_ref.update_gpu_status(msg)
-                        if hasattr(self, 'status_callback'):
-                            self.status_callback("[警告] 未检测到可用GPU，已切换为CPU推理。请检查CUDA/cuDNN环境配置。")
+                        if hasattr(self, "status_callback"):
+                            self.status_callback(
+                                "[警告] 未检测到可用GPU，已切换为CPU推理。请检查CUDA/cuDNN环境配置。"
+                            )
                 except Exception:
-                    msg = ("检测GPU状态时发生异常，可能未正确安装CUDA/cuDNN或onnxruntime-gpu。已自动切换为CPU推理。")
-                    if hasattr(self, 'ui_ref') and hasattr(self.ui_ref, 'update_gpu_status'):
+                    msg = "检测GPU状态时发生异常，可能未正确安装CUDA/cuDNN或onnxruntime-gpu。已自动切换为CPU推理。"
+                    if hasattr(self, "ui_ref") and hasattr(
+                        self.ui_ref, "update_gpu_status"
+                    ):
                         self.ui_ref.update_gpu_status(msg)
-                    if hasattr(self, 'status_callback'):
-                        self.status_callback("[警告] GPU检测异常，已切换为CPU推理。请检查CUDA/cuDNN环境配置。")
+                    if hasattr(self, "status_callback"):
+                        self.status_callback(
+                            "[警告] GPU检测异常，已切换为CPU推理。请检查CUDA/cuDNN环境配置。"
+                        )
         except Exception as e:
             if use_gpu:
                 msg = f"GPU初始化失败，已自动切换为CPU。请检查CUDA/cuDNN环境配置。错误信息: {e}"
-                if hasattr(self, 'ui_ref') and hasattr(self.ui_ref, 'update_gpu_status'):
+                if hasattr(self, "ui_ref") and hasattr(
+                    self.ui_ref, "update_gpu_status"
+                ):
                     self.ui_ref.update_gpu_status(msg)
-                if hasattr(self, 'status_callback'):
-                    self.status_callback("[警告] GPU初始化失败，已切换为CPU推理。请检查CUDA/cuDNN环境配置。")
+                if hasattr(self, "status_callback"):
+                    self.status_callback(
+                        "[警告] GPU初始化失败，已切换为CPU推理。请检查CUDA/cuDNN环境配置。"
+                    )
                 ocr_kwargs["use_gpu"] = False
                 self.model = ONNXPaddleOcr(**ocr_kwargs)
             else:

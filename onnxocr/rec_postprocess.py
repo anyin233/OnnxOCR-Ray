@@ -126,7 +126,7 @@ class DistillationCTCLabelDecode(CTCLabelDecode):
         model_name=["student"],
         key=None,
         multi_head=False,
-        **kwargs
+        **kwargs,
     ):
         super(DistillationCTCLabelDecode, self).__init__(
             character_dict_path, use_space_char
@@ -558,7 +558,7 @@ class DistillationSARLabelDecode(SARLabelDecode):
         model_name=["student"],
         key=None,
         multi_head=False,
-        **kwargs
+        **kwargs,
     ):
         super(DistillationSARLabelDecode, self).__init__(
             character_dict_path, use_space_char
@@ -646,7 +646,6 @@ class NRTRLabelDecode(BaseRecLabelDecode):
         super(NRTRLabelDecode, self).__init__(character_dict_path, use_space_char)
 
     def __call__(self, preds, label=None, *args, **kwargs):
-
         if len(preds) == 2:
             preds_id = preds[0]
             preds_prob = preds[1]

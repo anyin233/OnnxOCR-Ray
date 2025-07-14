@@ -5,29 +5,27 @@ import math
 
 
 class NormalizeImage(object):
-    """ normalize image such as substract mean, divide std
-    """
+    """normalize image such as substract mean, divide std"""
 
-    def __init__(self, scale=None, mean=None, std=None, order='chw', **kwargs):
+    def __init__(self, scale=None, mean=None, std=None, order="chw", **kwargs):
         if isinstance(scale, str):
             scale = eval(scale)
         self.scale = np.float32(scale if scale is not None else 1.0 / 255.0)
         mean = mean if mean is not None else [0.485, 0.456, 0.406]
         std = std if std is not None else [0.229, 0.224, 0.225]
 
-        shape = (3, 1, 1) if order == 'chw' else (1, 1, 3)
-        self.mean = np.array(mean).reshape(shape).astype('float32')
-        self.std = np.array(std).reshape(shape).astype('float32')
+        shape = (3, 1, 1) if order == "chw" else (1, 1, 3)
+        self.mean = np.array(mean).reshape(shape).astype("float32")
+        self.std = np.array(std).reshape(shape).astype("float32")
 
     def __call__(self, data):
-        img = data['image']
+        img = data["image"]
         from PIL import Image
+
         if isinstance(img, Image.Image):
             img = np.array(img)
-        assert isinstance(img,
-                          np.ndarray), "invalid input 'img' in NormalizeImage"
-        data['image'] = (
-            img.astype('float32') * self.scale - self.mean) / self.std
+        assert isinstance(img, np.ndarray), "invalid input 'img' in NormalizeImage"
+        data["image"] = (img.astype("float32") * self.scale - self.mean) / self.std
         return data
 
 
@@ -36,23 +34,23 @@ class DetResizeForTest(object):
         super(DetResizeForTest, self).__init__()
         self.resize_type = 0
         self.keep_ratio = False
-        if 'image_shape' in kwargs:
-            self.image_shape = kwargs['image_shape']
+        if "image_shape" in kwargs:
+            self.image_shape = kwargs["image_shape"]
             self.resize_type = 1
-            if 'keep_ratio' in kwargs:
-                self.keep_ratio = kwargs['keep_ratio']
-        elif 'limit_side_len' in kwargs:
-            self.limit_side_len = kwargs['limit_side_len']
-            self.limit_type = kwargs.get('limit_type', 'min')
-        elif 'resize_long' in kwargs:
+            if "keep_ratio" in kwargs:
+                self.keep_ratio = kwargs["keep_ratio"]
+        elif "limit_side_len" in kwargs:
+            self.limit_side_len = kwargs["limit_side_len"]
+            self.limit_type = kwargs.get("limit_type", "min")
+        elif "resize_long" in kwargs:
             self.resize_type = 2
-            self.resize_long = kwargs.get('resize_long', 960)
+            self.resize_long = kwargs.get("resize_long", 960)
         else:
             self.limit_side_len = 736
-            self.limit_type = 'min'
+            self.limit_type = "min"
 
     def __call__(self, data):
-        img = data['image']
+        img = data["image"]
         src_h, src_w, _ = img.shape
         if sum([src_h, src_w]) < 64:
             img = self.image_padding(img)
@@ -65,8 +63,8 @@ class DetResizeForTest(object):
         else:
             # img, shape = self.resize_image_type1(img)
             img, [ratio_h, ratio_w] = self.resize_image_type1(img)
-        data['image'] = img
-        data['shape'] = np.array([src_h, src_w, ratio_h, ratio_w])
+        data["image"] = img
+        data["shape"] = np.array([src_h, src_w, ratio_h, ratio_w])
         return data
 
     def image_padding(self, im, value=0):
@@ -100,26 +98,26 @@ class DetResizeForTest(object):
         h, w, c = img.shape
 
         # limit the max side
-        if self.limit_type == 'max':
+        if self.limit_type == "max":
             if max(h, w) > limit_side_len:
                 if h > w:
                     ratio = float(limit_side_len) / h
                 else:
                     ratio = float(limit_side_len) / w
             else:
-                ratio = 1.
-        elif self.limit_type == 'min':
+                ratio = 1.0
+        elif self.limit_type == "min":
             if min(h, w) < limit_side_len:
                 if h < w:
                     ratio = float(limit_side_len) / h
                 else:
                     ratio = float(limit_side_len) / w
             else:
-                ratio = 1.
-        elif self.limit_type == 'resize_long':
+                ratio = 1.0
+        elif self.limit_type == "resize_long":
             ratio = float(limit_side_len) / max(h, w)
         else:
-            raise Exception('not support limit type, image ')
+            raise Exception("not support limit type, image ")
         resize_h = int(h * ratio)
         resize_w = int(w * ratio)
 
@@ -160,19 +158,20 @@ class DetResizeForTest(object):
 
         return img, [ratio_h, ratio_w]
 
+
 class ToCHWImage(object):
-    """ convert hwc image to chw image
-    """
+    """convert hwc image to chw image"""
 
     def __init__(self, **kwargs):
         pass
 
     def __call__(self, data):
-        img = data['image']
+        img = data["image"]
         from PIL import Image
+
         if isinstance(img, Image.Image):
             img = np.array(img)
-        data['image'] = img.transpose((2, 0, 1))
+        data["image"] = img.transpose((2, 0, 1))
         return data
 
 

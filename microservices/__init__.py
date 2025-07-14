@@ -3,7 +3,7 @@ from .detection_service import app as detection_app
 from .recognition_service import app as recognition_app
 
 __all__ = [
-  'classification_app',
-  'detection_app', 
-  'recognition_app',
+    "classification_app",
+    "detection_app",
+    "recognition_app",
 ]

@@ -13,5 +13,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=5005,
         reload=True,  # 开发模式下自动重载
-        log_level="info"
+        log_level="info",
     )
