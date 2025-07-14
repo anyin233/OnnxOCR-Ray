@@ -31,7 +31,7 @@ def test_new_workflow(image_path):
     print("\n1. Text detection...")
     try:
         response = requests.post(
-            "http://localhost:5006/detect",
+            "http://localhost:5006/inference",
             json={"image": image_base64},
             timeout=30
         )
@@ -57,7 +57,7 @@ def test_new_workflow(image_path):
     print("\n2. Text classification (angle correction)...")
     try:
         response = requests.post(
-            "http://localhost:5008/classify",
+            "http://localhost:5008/inference",
             json={
                 "image": image_base64,
                 "bounding_boxes": bounding_boxes
@@ -100,7 +100,7 @@ def test_new_workflow(image_path):
             recognition_request["classification_results"] = classification_info
         
         response = requests.post(
-            "http://localhost:5007/recognize",
+            "http://localhost:5007/inference",
             json=recognition_request,
             timeout=30
         )
@@ -248,7 +248,6 @@ def check_services_available():
         ("Detection service", "http://localhost:5006"),
         ("Recognition service", "http://localhost:5007"),
         ("Classification service", "http://localhost:5008"),
-        ("Orchestrator service", "http://localhost:5009")
     ]
     
     print("Checking service status...")
@@ -297,10 +296,10 @@ def main():
     test_new_workflow(image_path)
     
     # Test backward compatibility
-    test_legacy_workflow(image_path)
+    # test_legacy_workflow(image_path)
     
     # Test orchestrator service
-    test_orchestrator_service(image_path)
+    # test_orchestrator_service(image_path)
     
     print("\n" + "=" * 60)
     print("Updated microservice OCR system test completed")

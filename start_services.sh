@@ -14,9 +14,12 @@ fi
 # Create log directory
 mkdir -p logs
 
+export PATH=$PATH:.venv/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:.venv/lib/python3.10/site-packages/nvidia/cudnn/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.venv/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:.venv/lib/python3.10/site-packages/nvidia/cudnn/lib
+
 # Start detection service
 echo "Starting text detection service (port 5006)..."
-uv run microservices/detection_service.py > logs/detection.log 2>&1 &
+uv run service_entry_point.py -s detection -p 5006 > logs/detection.log 2>&1 &
 DETECTION_PID=$!
 echo "Detection service PID: $DETECTION_PID"
 
@@ -25,7 +28,7 @@ sleep 2
 
 # Start recognition service
 echo "Starting text recognition service (port 5007)..."
-uv run microservices/recognition_service.py > logs/recognition.log 2>&1 &
+uv run service_entry_point.py -s recognition -p 5007 > logs/recognition.log 2>&1 &
 RECOGNITION_PID=$!
 echo "Recognition service PID: $RECOGNITION_PID"
 
@@ -34,7 +37,7 @@ sleep 2
 
 # Start classification service
 echo "Starting text classification service (port 5008)..."
-uv run microservices/classification_service.py > logs/classification.log 2>&1 &
+uv run service_entry_point.py -s classification -p 5008 > logs/classification.log 2>&1 &
 CLASSIFICATION_PID=$!
 echo "Classification service PID: $CLASSIFICATION_PID"
 

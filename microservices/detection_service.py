@@ -23,7 +23,7 @@ inference_args_dict = {}
 for action in parser._actions:
     inference_args_dict[action.dest] = action.default
 params = argparse.Namespace(**inference_args_dict)
-params.use_gpu = False
+params.use_gpu = True
 
 detector = TextDetector(params)
 

@@ -160,4 +160,5 @@ cython_debug/
 #.idea/
 
 *.jpg
-logs
+logs# pixi environments
+.pixi

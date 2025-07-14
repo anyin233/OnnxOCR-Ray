@@ -9,6 +9,8 @@ dependencies = [
     "imgaug>=0.4.0",
     "lmdb>=1.7.2",
     "numpy>=2.2.6",
+    "nvidia-cuda-runtime-cu12>=12.9.79",
+    "nvidia-cudnn-cu12>=9.10.2.21",
     "onnxruntime-gpu>=1.22.0",
     "opencv-contrib-python>=4.11.0.86",
     "opencv-python>=4.11.0.86",
@@ -23,3 +25,12 @@ dependencies = [
     "typer>=0.16.0",
     "uvicorn>=0.35.0",
 ]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+onnxocr = { path = ".", editable = true }
+
+[tool.pixi.tasks]
