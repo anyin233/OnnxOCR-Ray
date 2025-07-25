@@ -44,7 +44,7 @@ def submit_ocr_task(url, image_bytes):
     if response.status_code != 200:
         print(f"Error submitting OCR task: {response.status_code} - {response.text}")
         return response, None, None, None
-    return response.json()
+    return response
 
 
 def main():

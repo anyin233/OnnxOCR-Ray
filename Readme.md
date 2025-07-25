@@ -2,6 +2,8 @@
 
 ## Usage
 
+### Run Single Service
+
 ```
 uv run service_entry_point.py -s <service> -p <port> -h <host>
 ```
@@ -10,6 +12,18 @@ Support services:
 - classification: Angle classification
 - detection: Text detection
 - recognition: Text recognition
+
+### Run All Services
+
+```
+./start_services.sh
+```
+
+### Run All Services With Ray
+
+```
+uv run serve run ocr_app_scale.yaml
+```
 
 ## API Reference
 

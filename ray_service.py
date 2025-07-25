@@ -1,5 +1,6 @@
 import ray
 import ray.serve
+from ray.util.placement_group import placement_group
 from pydantic import BaseModel
 from fastapi import FastAPI
 
@@ -11,15 +12,15 @@ from microservices_ray.recognition_service import RecognitionService, Recognitio
 
 app = FastAPI()
 
-@ray.serve.deployment(name="detection_service", ray_actor_options={"num_cpus": 0, "num_gpus": 0.1})
+@ray.serve.deployment(name="detection_service", ray_actor_options={"num_cpus": 0, "num_gpus": 0.007})
 class DetectionServiceDeployment(DetectionService):
     pass
 
-@ray.serve.deployment(name="classification_service", ray_actor_options={"num_cpus": 0, "num_gpus": 0.1})
+@ray.serve.deployment(name="classification_service", ray_actor_options={"num_cpus": 0, "num_gpus": 0.005})
 class ClassificationServiceDeployment(ClassificationService):
     pass
 
-@ray.serve.deployment(name="recognition_service", ray_actor_options={"num_cpus": 0, "num_gpus": 0.1})
+@ray.serve.deployment(name="recognition_service", ray_actor_options={"num_cpus": 0, "num_gpus": 0.015})
 class RecognitionServiceDeployment(RecognitionService):
     pass
 
