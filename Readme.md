@@ -25,6 +25,14 @@ Support services:
 uv run serve run ocr_app_scale.yaml
 ```
 
+### Run Services with Service Manager
+
+```
+uv run ocr_service_manager.py
+```
+
+Docs -> OCR_SERVICE_MANAGER_API_DOCS.md
+
 ## API Reference
 
 ### Common APIs
