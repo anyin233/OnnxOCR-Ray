@@ -274,7 +274,7 @@ def check_services_available():
 def main():
     """Main function"""
     # Test image
-    image_path = "demo_text_ocr.jpg"
+    image_path = "draw_ocr.jpg"
 
     if not os.path.exists(image_path):
         print(f"✗ Test image file does not exist: {image_path}")
