@@ -12,8 +12,12 @@ from typing import List, Optional
 from onnxocr.predict_cls import TextClassifier
 from onnxocr.utils import infer_args as init_args
 import argparse
-from microservices_ray.common import decode_image, encode_image, crop_image_from_box, BoundingBox
-
+from microservices_ray.common import (
+    decode_image,
+    encode_image,
+    crop_image_from_box,
+    BoundingBox,
+)
 
 
 class ClassificationRequest(BaseModel):
@@ -42,8 +46,6 @@ class ClassificationResponse(BaseModel):
     results: List[ClassificationResult]
 
 
-
-
 class ClassificationService:
     def __init__(self):
         # Initialize classification model
@@ -55,7 +57,7 @@ class ClassificationService:
         params.use_gpu = True
 
         self.classifier = TextClassifier(params)
-    
+
     async def classify_text_angle(self, request: ClassificationRequest):
         """Text angle classification service - based on detection bounding boxes"""
         try:
@@ -105,13 +107,14 @@ class ClassificationService:
                     )
                 )
 
-            return ClassificationResponse(processing_time=processing_time, results=results)
+            return ClassificationResponse(
+                processing_time=processing_time, results=results
+            )
 
         except ValueError as e:
             raise RuntimeError(f"Invalid input: {str(e)}")
         except Exception as e:
             raise RuntimeError(f"Classification error: {str(e)}")
-
 
     async def classify_single_text_angle(self, request: SingleImageRequest):
         """Text angle classification service - single image"""
@@ -154,5 +157,3 @@ class ClassificationService:
             raise RuntimeError(f"Invalid input: {str(e)}")
         except Exception as e:
             raise RuntimeError(f"Classification error: {str(e)}")
-
-

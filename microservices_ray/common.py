@@ -4,11 +4,13 @@ import cv2
 from pydantic import BaseModel
 from typing import List
 
+
 # Define response model
 class BoundingBox(BaseModel):
     coordinates: List[
         List[float]
     ]  # 4 points coordinates [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+
 
 def decode_image(image_base64: str):
     """Decode base64 image"""

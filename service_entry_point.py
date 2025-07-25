@@ -60,11 +60,11 @@ def start_service(
     port: int,
     host: str,
 ):
-
     port = find_neareast_available_port(port)
     typer.echo(f"Starting {service} service on {host}:{port}")
     run_service(service, port, host)
     pass
+
 
 @app.command(name="run", help="Run the OCR microservice")
 def main(

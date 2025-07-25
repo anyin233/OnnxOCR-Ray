@@ -20,12 +20,10 @@ class DetectionRequest(BaseModel):
     image: str  # base64 encoded image
 
 
-
-
-
 class DetectionResponse(BaseModel):
     processing_time: float
     bounding_boxes: List[BoundingBox]
+
 
 class DetectionService:
     def __init__(self):
@@ -38,7 +36,7 @@ class DetectionService:
         params.use_gpu = True
 
         self.detector = TextDetector(params)
-        
+
     async def detect_text(self, request: DetectionRequest):
         """文本检测服务"""
         try:
@@ -75,4 +73,3 @@ class DetectionService:
 
     async def detect_from_crops(self, request: DetectionRequest):
         return await detect_text(request)
-

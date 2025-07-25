@@ -10,7 +10,6 @@ import aiofiles
 OCR_SERVICE_URL = "http://localhost:8000/ocr"
 
 
-
 from rich.progress import track
 import io
 import random
@@ -24,15 +23,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description="OCR Benchmark Test")
 
     parser.add_argument("-t", "--total_time", type=float, default=2.0)
-    parser.add_argument("-w", "--workers", type=int, default=10, help="Number of worker threads")
+    parser.add_argument(
+        "-w", "--workers", type=int, default=10, help="Number of worker threads"
+    )
 
     args = parser.parse_args()
     return args
 
 
 def submit_ocr_task(url, image_bytes):
-    
-
     # 将图像字节转换为base64编码
     image_base64 = base64.b64encode(image_bytes.getvalue()).decode("utf-8")
 
@@ -55,7 +54,9 @@ def main():
     response = submit_ocr_task(OCR_SERVICE_URL, io.BytesIO(image_bytes))
     print(f"Single image OCR response: {response}")
     args = parse_args()
-    print(f"Starting OCR benchmark with total time: {args.total_time} seconds and {args.workers} workers...")
+    print(
+        f"Starting OCR benchmark with total time: {args.total_time} seconds and {args.workers} workers..."
+    )
     responses = []
 
     failed = []
@@ -121,10 +122,14 @@ def main():
             if current_time < target_time:
                 time.sleep(target_time - current_time)
 
-            futures.append(executor.submit(submit_ocr_task, OCR_SERVICE_URL, image_bytes))
+            futures.append(
+                executor.submit(submit_ocr_task, OCR_SERVICE_URL, image_bytes)
+            )
 
             # Process results with progress tracking
-        for future in track(futures, description="Receiving OCR requests...", total=len(image_byte_list)):
+        for future in track(
+            futures, description="Receiving OCR requests...", total=len(image_byte_list)
+        ):
             response = future.result()
             if response.status_code != 200:
                 failed.append(index)

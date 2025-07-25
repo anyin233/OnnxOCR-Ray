@@ -21,7 +21,6 @@ app = FastAPI(
 )
 
 
-
 class ClassificationInfo(BaseModel):
     angle: int  # angle
     confidence: float
@@ -58,7 +57,6 @@ class RecognitionResponse(BaseModel):
 
 
 class RecognitionService:
-    
     def __init__(self):
         # Initialize recognition model
         parser = init_args()
@@ -69,7 +67,6 @@ class RecognitionService:
         params.use_gpu = True
 
         self.recognizer = TextRecognizer(params)
-        
 
     async def recognize_text(self, request: RecognitionRequest):
         """Text recognition service - based on detection bounding boxes and classification results"""
@@ -95,7 +92,10 @@ class RecognitionService:
                         img_list.append(rotated_img)
                         valid_boxes.append(bbox.coordinates)
                         angle_info.append(
-                            {"angle": cls_result.angle, "confidence": cls_result.confidence}
+                            {
+                                "angle": cls_result.angle,
+                                "confidence": cls_result.confidence,
+                            }
                         )
             else:
                 # No classification results, crop directly from original image
@@ -117,7 +117,9 @@ class RecognitionService:
 
             # Format results
             results = []
-            for i, (res, bbox, angle) in enumerate(zip(rec_res, valid_boxes, angle_info)):
+            for i, (res, bbox, angle) in enumerate(
+                zip(rec_res, valid_boxes, angle_info)
+            ):
                 if isinstance(res, (list, tuple)) and len(res) >= 2:
                     text = str(res[0])
                     confidence = float(res[1])
@@ -173,4 +175,3 @@ class RecognitionService:
             raise RuntimeError(str(e))
         except Exception as e:
             raise RuntimeError(f"Recognition error: {str(e)}")
-
