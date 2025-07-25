@@ -80,7 +80,7 @@ class OCRServiceManagerTester:
             print("✅ OCR服务管理器已停止")
 
     def test_start_service(
-        self, device_id: str = "cpu", service_type: str = "detection", port: int = 5005
+        self, device_id: str = "cuda:0", service_type: str = "detection", port: int = 5005
     ) -> Dict[str, Any]:
         """测试启动服务"""
         print(f"\n📝 测试启动服务: {service_type} on {device_id}")
@@ -271,9 +271,9 @@ class OCRServiceManagerTester:
         print("\n🔄 测试多个服务同时运行")
 
         services_to_test = [
-            {"device_id": "cpu", "service_type": "detection", "port": 5005},
-            {"device_id": "cpu", "service_type": "recognition", "port": 5006},
-            {"device_id": "cpu", "service_type": "classification", "port": 5007},
+            {"device_id": "cuda:0", "service_type": "detection", "port": 5005},
+            {"device_id": "cuda:1", "service_type": "recognition", "port": 5006},
+            {"device_id": "cuda:2", "service_type": "classification", "port": 5007},
         ]
 
         started_services = []
@@ -344,7 +344,7 @@ class OCRServiceManagerTester:
         print("测试无效的数据格式...")
         # 启动一个检测服务用于测试
         start_result = self.test_start_service(
-            device_id="cpu", service_type="detection", port=5050
+            device_id="cuda:0", service_type="detection", port=5050
         )
         if start_result["success"]:
             model_id = start_result["data"]["model_id"]
@@ -383,9 +383,9 @@ class OCRServiceManagerTester:
         started_service_ids = []
 
         # 启动不同类型的服务
-        for service_config in test_services:
+        for index, service_config in enumerate(test_services):
             result = self.test_start_service(
-                device_id="cpu",
+                device_id=f"cuda:{index}",
                 service_type=service_config["service_type"],
                 port=service_config["port"],
             )
